@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../models/chat_models.dart';
 
 const _uuid = Uuid();
@@ -16,12 +17,79 @@ class ChatProvider extends ChangeNotifier {
   bool get isSenderMode => _isSenderMode;
   bool get viewChatList => _viewChatList;
 
-  void setViewChatList(bool value) {
-    _viewChatList = value;
-    notifyListeners();
+  ChatProvider() {
+    _loadFromDatabase();
+  }
+
+  // ─── Database Operations ───────────────────────────────────────────────────
+
+  void _loadFromDatabase() {
+    try {
+      final sessionsBox = Hive.box('sessions_box');
+      final settingsBox = Hive.box('settings_box');
+
+      _sessions.clear();
+      for (final key in sessionsBox.keys) {
+        final val = sessionsBox.get(key);
+        if (val is Map) {
+          try {
+            _sessions.add(ChatSession.fromMap(val));
+          } catch (e) {
+            debugPrint('Error loading session $key: $e');
+          }
+        }
+      }
+
+      _isSenderMode = settingsBox.get('isSenderMode', defaultValue: true) as bool;
+      _viewChatList = settingsBox.get('viewChatList', defaultValue: false) as bool;
+      
+      final activeId = settingsBox.get('activeSessionId') as String?;
+      if (activeId != null && _sessions.any((s) => s.id == activeId)) {
+        _activeSession = _sessions.firstWhere((s) => s.id == activeId);
+      } else if (_sessions.isNotEmpty) {
+        _activeSession = _sessions.first;
+      }
+    } catch (e) {
+      debugPrint('Error initializing Hive in ChatProvider: $e');
+    }
+  }
+
+  void _saveSession(ChatSession session) {
+    try {
+      final sessionsBox = Hive.box('sessions_box');
+      sessionsBox.put(session.id, session.toMap());
+    } catch (e) {
+      debugPrint('Error saving session ${session.id}: $e');
+    }
+  }
+
+  void _deleteSessionFromDb(String sessionId) {
+    try {
+      final sessionsBox = Hive.box('sessions_box');
+      sessionsBox.delete(sessionId);
+    } catch (e) {
+      debugPrint('Error deleting session $sessionId: $e');
+    }
+  }
+
+  void _saveSettings() {
+    try {
+      final settingsBox = Hive.box('settings_box');
+      settingsBox.put('isSenderMode', _isSenderMode);
+      settingsBox.put('viewChatList', _viewChatList);
+      settingsBox.put('activeSessionId', _activeSession?.id);
+    } catch (e) {
+      debugPrint('Error saving settings: $e');
+    }
   }
 
   // ─── Session Management ────────────────────────────────────────────────────
+
+  void setViewChatList(bool value) {
+    _viewChatList = value;
+    _saveSettings();
+    notifyListeners();
+  }
 
   void createSession(Platform platform) {
     final contact = ChatUser(
@@ -40,6 +108,8 @@ class ChatProvider extends ChangeNotifier {
     _sessions.add(session);
     _activeSession = session;
     _viewChatList = false;
+    _saveSession(session);
+    _saveSettings();
     notifyListeners();
   }
 
@@ -66,20 +136,25 @@ class ChatProvider extends ChangeNotifier {
     _sessions.add(session);
     _activeSession = session;
     _viewChatList = false;
+    _saveSession(session);
+    _saveSettings();
     notifyListeners();
   }
 
   void setActiveSession(ChatSession session) {
     _activeSession = session;
     _viewChatList = false;
+    _saveSettings();
     notifyListeners();
   }
 
   void deleteSession(String sessionId) {
     _sessions.removeWhere((s) => s.id == sessionId);
+    _deleteSessionFromDb(sessionId);
     if (_activeSession?.id == sessionId) {
       _activeSession = _sessions.isNotEmpty ? _sessions.last : null;
     }
+    _saveSettings();
     notifyListeners();
   }
 
@@ -101,6 +176,7 @@ class ChatProvider extends ChangeNotifier {
       status: status,
     );
     _activeSession!.messages.add(msg);
+    _saveSession(_activeSession!);
     notifyListeners();
   }
 
@@ -122,6 +198,7 @@ class ChatProvider extends ChangeNotifier {
       imageBytes: imageBytes,
     );
     _activeSession!.messages.add(msg);
+    _saveSession(_activeSession!);
     notifyListeners();
   }
 
@@ -142,6 +219,7 @@ class ChatProvider extends ChangeNotifier {
       audioDuration: duration,
     );
     _activeSession!.messages.add(msg);
+    _saveSession(_activeSession!);
     notifyListeners();
   }
 
@@ -160,12 +238,14 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.read,
     );
     _activeSession!.messages.add(msg);
+    _saveSession(_activeSession!);
     notifyListeners();
   }
 
   void addMessage(ChatMessage message) {
     if (_activeSession == null) return;
     _activeSession!.messages.add(message);
+    _saveSession(_activeSession!);
     notifyListeners();
   }
 
@@ -174,6 +254,7 @@ class ChatProvider extends ChangeNotifier {
     final idx = _activeSession!.messages.indexWhere((m) => m.id == messageId);
     if (idx >= 0) {
       _activeSession!.messages[idx] = updated;
+      _saveSession(_activeSession!);
       notifyListeners();
     }
   }
@@ -181,6 +262,7 @@ class ChatProvider extends ChangeNotifier {
   void deleteMessage(String messageId) {
     if (_activeSession == null) return;
     _activeSession!.messages.removeWhere((m) => m.id == messageId);
+    _saveSession(_activeSession!);
     notifyListeners();
   }
 
@@ -189,6 +271,7 @@ class ChatProvider extends ChangeNotifier {
     if (newIdx > oldIdx) newIdx -= 1;
     final item = _activeSession!.messages.removeAt(oldIdx);
     _activeSession!.messages.insert(newIdx, item);
+    _saveSession(_activeSession!);
     notifyListeners();
   }
 
@@ -198,7 +281,10 @@ class ChatProvider extends ChangeNotifier {
     if (_activeSession == null) return;
     _activeSession = _activeSession!.copyWith(contactUser: updated);
     final idx = _sessions.indexWhere((s) => s.id == _activeSession!.id);
-    if (idx >= 0) _sessions[idx] = _activeSession!;
+    if (idx >= 0) {
+      _sessions[idx] = _activeSession!;
+      _saveSession(_activeSession!);
+    }
     notifyListeners();
   }
 
@@ -220,6 +306,7 @@ class ChatProvider extends ChangeNotifier {
     String? groupMembers,
     bool? isBlocked,
     bool? isBlockedMe,
+    bool? isDisappearing,
     bool clearCustomLastMessage = false,
     bool clearCustomLastMessageTime = false,
     bool clearLastMessageIsSender = false,
@@ -243,12 +330,16 @@ class ChatProvider extends ChangeNotifier {
       groupMembers: groupMembers,
       isBlocked: isBlocked,
       isBlockedMe: isBlockedMe,
+      isDisappearing: isDisappearing,
       clearCustomLastMessage: clearCustomLastMessage,
       clearCustomLastMessageTime: clearCustomLastMessageTime,
       clearLastMessageIsSender: clearLastMessageIsSender,
     );
     final idx = _sessions.indexWhere((s) => s.id == _activeSession!.id);
-    if (idx >= 0) _sessions[idx] = _activeSession!;
+    if (idx >= 0) {
+      _sessions[idx] = _activeSession!;
+      _saveSession(_activeSession!);
+    }
     notifyListeners();
   }
 
@@ -256,11 +347,13 @@ class ChatProvider extends ChangeNotifier {
 
   void toggleSenderMode() {
     _isSenderMode = !_isSenderMode;
+    _saveSettings();
     notifyListeners();
   }
 
   void setSenderMode(bool value) {
     _isSenderMode = value;
+    _saveSettings();
     notifyListeners();
   }
 

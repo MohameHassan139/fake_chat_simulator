@@ -19,6 +19,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
   DateTime? _lastSeen;
   bool _isBlocked = false;
   bool _isBlockedMe = false;
+  bool _isDisappearing = false;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
     _lastSeen = contact?.lastSeen;
     _isBlocked = session?.isBlocked ?? false;
     _isBlockedMe = session?.isBlockedMe ?? false;
+    _isDisappearing = session?.isDisappearing ?? false;
   }
 
   @override
@@ -56,6 +58,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
     chatProvider.updateSessionSettings(
       isBlocked: _isBlocked,
       isBlockedMe: _isBlockedMe,
+      isDisappearing: _isDisappearing,
     );
     Navigator.pop(context);
   }
@@ -210,6 +213,13 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
               label: 'Contact Blocked Me',
               value: _isBlockedMe,
               onChanged: (v) => setState(() => _isBlockedMe = v),
+            ),
+
+            // Disappearing Messages toggle
+            _ToggleRow(
+              label: 'Disappearing Messages (Timer)',
+              value: _isDisappearing,
+              onChanged: (v) => setState(() => _isDisappearing = v),
             ),
 
             // Last seen (only when offline)

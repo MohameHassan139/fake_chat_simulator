@@ -86,6 +86,8 @@ class AppTheme {
         primary: _accent,
         secondary: _accentSecondary,
         surface: Colors.white,
+        onSurface: Colors.black,
+        onPrimary: Colors.white,
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
@@ -108,6 +110,40 @@ class AppTheme {
           statusBarIconBrightness: Brightness.dark,
           statusBarBrightness: Brightness.light,
         ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: _accent,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        filled: true,
+        fillColor: Color(0xFFEEEEEE),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: _accent, width: 2),
+        ),
+        hintStyle: TextStyle(color: Colors.black38),
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      textTheme: const TextTheme(
+        headlineLarge:
+            TextStyle(fontWeight: FontWeight.w800, letterSpacing: -1),
+        headlineMedium:
+            TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.5),
+        titleLarge: TextStyle(fontWeight: FontWeight.w600),
+        bodyMedium: TextStyle(height: 1.5),
       ),
     );
   }

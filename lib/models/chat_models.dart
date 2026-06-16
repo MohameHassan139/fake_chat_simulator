@@ -44,6 +44,30 @@ class ChatUser {
     );
   }
 
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'avatarBytes': avatarBytes,
+      'onlineStatus': onlineStatus.index,
+      'lastSeen': lastSeen?.millisecondsSinceEpoch,
+      'isTyping': isTyping,
+    };
+  }
+
+  factory ChatUser.fromMap(Map<dynamic, dynamic> map) {
+    return ChatUser(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      avatarBytes: _parseBytes(map['avatarBytes']),
+      onlineStatus: UserOnlineStatus.values[map['onlineStatus'] as int? ?? 0],
+      lastSeen: map['lastSeen'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['lastSeen'] as int)
+          : null,
+      isTyping: map['isTyping'] as bool? ?? false,
+    );
+  }
+
   String get statusText {
     switch (onlineStatus) {
       case UserOnlineStatus.online:
@@ -144,6 +168,46 @@ class ChatMessage {
     );
   }
 
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'text': text,
+      'type': type.index,
+      'isSender': isSender,
+      'timestamp': timestamp.millisecondsSinceEpoch,
+      'status': status.index,
+      'imagePath': imagePath,
+      'imageBytes': imageBytes,
+      'audioDuration': audioDuration?.inMilliseconds,
+      'reaction': reaction,
+      'repliedToId': repliedToId,
+      'repliedToText': repliedToText,
+      'repliedToSenderName': repliedToSenderName,
+    };
+  }
+
+  factory ChatMessage.fromMap(Map<dynamic, dynamic> map) {
+    return ChatMessage(
+      id: map['id'] as String,
+      text: map['text'] as String? ?? '',
+      type: MessageType.values[map['type'] as int? ?? 0],
+      isSender: map['isSender'] as bool? ?? true,
+      timestamp: map['timestamp'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int)
+          : DateTime.now(),
+      status: MessageStatus.values[map['status'] as int? ?? 3],
+      imagePath: map['imagePath'] as String?,
+      imageBytes: _parseBytes(map['imageBytes']),
+      audioDuration: map['audioDuration'] != null
+          ? Duration(milliseconds: map['audioDuration'] as int)
+          : null,
+      reaction: map['reaction'] as String?,
+      repliedToId: map['repliedToId'] as String?,
+      repliedToText: map['repliedToText'] as String?,
+      repliedToSenderName: map['repliedToSenderName'] as String?,
+    );
+  }
+
   String get formattedTime {
     final h = timestamp.hour.toString().padLeft(2, '0');
     final m = timestamp.minute.toString().padLeft(2, '0');
@@ -172,6 +236,7 @@ class ChatSession {
   String groupMembers;
   bool isBlocked;
   bool isBlockedMe;
+  bool isDisappearing;
 
   ChatSession({
     required this.id,
@@ -194,6 +259,7 @@ class ChatSession {
     this.groupMembers = '',
     this.isBlocked = false,
     this.isBlockedMe = false,
+    this.isDisappearing = false,
   }) : messages = messages ?? [];
 
   ChatSession copyWith({
@@ -216,6 +282,7 @@ class ChatSession {
     String? groupMembers,
     bool? isBlocked,
     bool? isBlockedMe,
+    bool? isDisappearing,
     bool clearCustomLastMessage = false,
     bool clearCustomLastMessageTime = false,
     bool clearLastMessageIsSender = false,
@@ -241,6 +308,61 @@ class ChatSession {
       groupMembers: groupMembers ?? this.groupMembers,
       isBlocked: isBlocked ?? this.isBlocked,
       isBlockedMe: isBlockedMe ?? this.isBlockedMe,
+      isDisappearing: isDisappearing ?? this.isDisappearing,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'platform': platform.index,
+      'contactUser': contactUser.toMap(),
+      'messages': messages.map((m) => m.toMap()).toList(),
+      'fakeTime': fakeTime,
+      'fakeBattery': fakeBattery,
+      'fakeWifi': fakeWifi,
+      'fakeName': fakeName,
+      'fakeAvatarBytes': fakeAvatarBytes,
+      'isDarkMode': isDarkMode,
+      'contactBio': contactBio,
+      'contactSubBio': contactSubBio,
+      'unreadCount': unreadCount,
+      'customLastMessage': customLastMessage,
+      'customLastMessageTime': customLastMessageTime,
+      'lastMessageIsSender': lastMessageIsSender,
+      'isGroup': isGroup,
+      'groupMembers': groupMembers,
+      'isBlocked': isBlocked,
+      'isBlockedMe': isBlockedMe,
+      'isDisappearing': isDisappearing,
+    };
+  }
+
+  factory ChatSession.fromMap(Map<dynamic, dynamic> map) {
+    return ChatSession(
+      id: map['id'] as String,
+      platform: Platform.values[map['platform'] as int? ?? 0],
+      contactUser: ChatUser.fromMap(map['contactUser'] as Map),
+      messages: (map['messages'] as List? ?? [])
+          .map((m) => ChatMessage.fromMap(m as Map))
+          .toList(),
+      fakeTime: map['fakeTime'] as String? ?? '9:41',
+      fakeBattery: map['fakeBattery'] as int? ?? 87,
+      fakeWifi: map['fakeWifi'] as bool? ?? true,
+      fakeName: map['fakeName'] as String? ?? 'You',
+      fakeAvatarBytes: _parseBytes(map['fakeAvatarBytes']),
+      isDarkMode: map['isDarkMode'] as bool? ?? false,
+      contactBio: map['contactBio'] as String?,
+      contactSubBio: map['contactSubBio'] as String?,
+      unreadCount: map['unreadCount'] as int? ?? 0,
+      customLastMessage: map['customLastMessage'] as String?,
+      customLastMessageTime: map['customLastMessageTime'] as String?,
+      lastMessageIsSender: map['lastMessageIsSender'] as bool?,
+      isGroup: map['isGroup'] as bool? ?? false,
+      groupMembers: map['groupMembers'] as String? ?? '',
+      isBlocked: map['isBlocked'] as bool? ?? false,
+      isBlockedMe: map['isBlockedMe'] as bool? ?? false,
+      isDisappearing: map['isDisappearing'] as bool? ?? false,
     );
   }
 
@@ -269,4 +391,11 @@ class ChatSession {
         return const Color(0xFFFFFC00);
     }
   }
+}
+
+Uint8List? _parseBytes(dynamic val) {
+  if (val == null) return null;
+  if (val is Uint8List) return val;
+  if (val is List) return Uint8List.fromList(List<int>.from(val));
+  return null;
 }

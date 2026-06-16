@@ -150,15 +150,31 @@ class _InboxAvatar extends StatelessWidget {
 }
 
 // ─── WhatsApp Inbox ────────────────────────────────────────────────────────────
-class _WhatsAppInbox extends StatelessWidget {
+class _WhatsAppInbox extends StatefulWidget {
   final ChatSession session;
   final PlatformTheme theme;
 
   const _WhatsAppInbox({required this.session, required this.theme});
 
   @override
+  State<_WhatsAppInbox> createState() => _WhatsAppInboxState();
+}
+
+class _WhatsAppInboxState extends State<_WhatsAppInbox> {
+  int _currentTabIndex =
+      0; // Chats = 0, Updates = 1, Communities = 2, Calls = 3
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = session.isDarkMode;
+    final isDark = widget.session.isDarkMode;
     final isAr = Provider.of<ThemeProvider>(context).isArabic;
     final chatProvider = Provider.of<ChatProvider>(context);
 
@@ -168,52 +184,238 @@ class _WhatsAppInbox extends StatelessWidget {
     // Default mock data to populate list
     final List<Map<String, dynamic>> mockChats = [
       {
-        'name': 'Sarah ☕',
-        'message': 'Are we still on for lunch?',
-        'time': '10:42 AM',
-        'unread': 2,
+        'name': 'Orange Egypt',
+        'message': isAr
+            ? 'نظيرًا لعدم وجود تفاعل، سيتم الآن إنهاء المحادثة. لا تتردد ف..'
+            : 'Due to lack of interaction, the conversation will be ended now. Don\'t hesitate to...',
+        'time': '12:55 ص',
+        'unread': 0,
+        'online': false,
+        'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': false,
+      },
+      {
+        'name': 'محمد ناجي',
+        'message': isAr ? 'تفاعلت بالرمز 😂 على "😂"' : 'Reacted 😂 to "😂"',
+        'time': isAr ? 'أمس' : 'Yesterday',
+        'unread': 0,
         'online': true,
         'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': false,
       },
       {
-        'name': 'Family Group 🏡',
-        'message': 'Dad: Check out this photo!',
-        'time': 'Yesterday',
+        'name': 'معتز',
+        'message': '😂',
+        'time': isAr ? 'أمس' : 'Yesterday',
         'unread': 0,
         'online': false,
         'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': false,
       },
       {
-        'name': 'Elon Musk 🚀',
-        'message': 'Mars is looking great today.',
-        'time': 'Wednesday',
+        'name': 'Khaled Nageh',
+        'message': 'https://www.instagram.com/reel/DZA77GI...',
+        'time': isAr ? 'أمس' : 'Yesterday',
         'unread': 0,
         'online': false,
         'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': true,
       },
       {
-        'name': 'Dev Collaboration',
-        'message': 'PR reviewed and merged successfully.',
-        'time': '24/05/2026',
+        'name': 'حسن المصر',
+        'message': isAr
+            ? 'تم تحديث مؤقت الرسائل. ستختفي الرسائل الجديدة من هذا...'
+            : 'Message timer updated. New messages will disappear from this...',
+        'time': isAr ? 'أمس' : 'Yesterday',
         'unread': 0,
         'online': false,
         'typing': false,
+        'isDisappearing': true,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': false,
+      },
+      {
+        'name': '+20 11 01860176',
+        'message': isAr ? 'علي خير أن شاء الله' : 'On goodness, God willing',
+        'time': isAr ? 'أمس' : 'Yesterday',
+        'unread': 0,
+        'online': false,
+        'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.delivered,
+        'isLastSenderMe': true,
+      },
+      {
+        'name': 'محمد عاطف',
+        'message': isAr
+            ? 'تفاعل محمد بالرمز ❤️ على "علي خير أن شاء الله"'
+            : 'Mohamed reacted ❤️ to "On goodness, God willing"',
+        'time': isAr ? 'أمس' : 'Yesterday',
+        'unread': 0,
+        'online': false,
+        'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': false,
+      },
+      {
+        'name': 'الشحاتين برو ماكس',
+        'message': isAr ? 'أنت: لا' : 'You: No',
+        'time': '20/05/2026',
+        'unread': 0,
+        'online': false,
+        'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': true,
+      },
+      {
+        'name': '7asobatyet Dalga',
+        'message': isAr ? 'مرحبا بك في المجموعة' : 'Welcome to the group',
+        'time': '12/05/2026',
+        'unread': 0,
+        'online': false,
+        'typing': false,
+        'isDisappearing': false,
+        'lastMsgStatus': MessageStatus.read,
+        'isLastSenderMe': false,
       }
     ];
 
     final Color primaryBg = isDark ? const Color(0xFF0B141A) : Colors.white;
-    final Color headerBg = isDark ? const Color(0xFF1F2C34) : const Color(0xFF008069);
-    final Color titleColor = Colors.white;
-    final Color iconColor = Colors.white;
+    final Color headerBg = isDark ? const Color(0xFF0B141A) : Colors.white;
+    final Color titleColor = isDark ? Colors.white : const Color(0xFF008069);
+    final Color iconColor = isDark ? Colors.white : const Color(0xFF667781);
     final Color textPrimary = isDark ? Colors.white : Colors.black;
     final Color textSecondary = isDark ? const Color(0xFF8696A0) : const Color(0xFF667781);
-    final Color activeGreen = isDark ? const Color(0xFF00A884) : const Color(0xFF25D366);
+    final Color activeGreen =
+        isDark ? const Color(0xFF00A884) : const Color(0xFF008069);
+
+    // Filter real sessions based on search query
+    final filteredRealSessions = realSessions.where((s) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final nameMatches = s.contactUser.name.toLowerCase().contains(query);
+      final hasMessages = s.messages.isNotEmpty;
+      final msgMatches =
+          hasMessages && s.messages.last.text.toLowerCase().contains(query);
+      return nameMatches || msgMatches;
+    }).toList();
+
+    // Filter mock sessions based on search query
+    final filteredMockChats = mockChats.where((m) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final nameMatches = m['name'].toString().toLowerCase().contains(query);
+      final msgMatches = m['message'].toString().toLowerCase().contains(query);
+      return nameMatches || msgMatches;
+    }).toList();
+
+    // Generate list of rows
+    final List<Widget> chatRows = [
+      ...filteredRealSessions.map((s) {
+        final hasMessages = s.messages.isNotEmpty;
+        final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty
+            ? s.groupMembers
+            : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
+        final lastMsgText = s.customLastMessage ??
+            (hasMessages ? s.messages.last.text : defaultLastMsgText);
+        final lastMsgTime = s.customLastMessageTime ??
+            (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
+        final isMe =
+            s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
+        
+        final lastMsg = hasMessages ? s.messages.last : null;
+        final isLastMsgRead =
+            lastMsg != null && lastMsg.status == MessageStatus.read;
+
+        final isBlocked = s.isBlocked || s.isBlockedMe;
+        final isOnline = !isBlocked &&
+            !s.isGroup &&
+            (s.contactUser.onlineStatus == UserOnlineStatus.online ||
+                s.contactUser.onlineStatus == UserOnlineStatus.typing);
+        final isTyping =
+            !isBlocked && s.contactUser.onlineStatus == UserOnlineStatus.typing;
+
+        return _WhatsAppRow(
+          name: s.contactUser.name,
+          avatarBytes: s.contactUser.avatarBytes,
+          message:
+              isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
+          time: lastMsgTime,
+          unreadCount: s.unreadCount,
+          isOnline: isOnline,
+          isTyping: isTyping,
+          isLastSenderMe: isMe,
+          isLastMessageRead: isLastMsgRead,
+          isDisappearing: s.isDisappearing,
+          isGroup: s.isGroup,
+          textPrimary: textPrimary,
+          textSecondary: textSecondary,
+          activeGreen: activeGreen,
+          isDark: isDark,
+          onTap: () {
+            chatProvider.setActiveSession(s);
+          },
+        );
+      }),
+      ...filteredMockChats.map((m) {
+        // Skip displaying mock if name already matches a real session
+        if (realSessions.any((s) => s.contactUser.name == m['name'])) {
+          return const SizedBox.shrink();
+        }
+
+        final isLastMsgRead = m['lastMsgStatus'] == MessageStatus.read;
+
+        return _WhatsAppRow(
+          name: m['name'],
+          avatarBytes: null,
+          message: m['message'],
+          time: m['time'],
+          unreadCount: m['unread'],
+          isOnline: m['online'],
+          isTyping: m['typing'],
+          isLastSenderMe: m['isLastSenderMe'],
+          isLastMessageRead: isLastMsgRead,
+          isDisappearing: m['isDisappearing'],
+          isGroup: false,
+          textPrimary: textPrimary,
+          textSecondary: textSecondary,
+          activeGreen: activeGreen,
+          isDark: isDark,
+          onTap: () {
+            chatProvider.createSessionCustom(
+              platform: Platform.whatsapp,
+              contactName: m['name'],
+              initialMessages: [
+                ChatMessage(
+                  id: 'init-mock',
+                  text: m['message'],
+                  isSender: m['isLastSenderMe'],
+                  status: m['lastMsgStatus'] as MessageStatus,
+                  timestamp:
+                      DateTime.now().subtract(const Duration(minutes: 5)),
+                ),
+              ],
+            );
+          },
+        );
+      }),
+    ];
 
     return Scaffold(
       backgroundColor: primaryBg,
       body: Column(
         children: [
-          // WhatsApp Green AppBar Header
+          // WhatsApp Green/Dark AppBar Header
           Container(
             color: headerBg,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -223,105 +425,514 @@ class _WhatsAppInbox extends StatelessWidget {
                   isAr ? 'واتساب' : 'WhatsApp',
                   style: TextStyle(
                     color: titleColor,
-                    fontSize: 20.5,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.camera_alt_outlined, color: iconColor, size: 21),
+                Icon(Icons.camera_alt_outlined, color: iconColor, size: 22),
                 const SizedBox(width: 20),
-                Icon(Icons.search, color: iconColor, size: 21),
-                const SizedBox(width: 14),
-                Icon(Icons.more_vert, color: iconColor, size: 21),
+                Icon(Icons.more_vert, color: iconColor, size: 22),
               ],
             ),
           ),
-          // WhatsApp Sub Tabs Row
-          Container(
-            color: headerBg,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildTab('Chats', isActive: true, activeColor: activeGreen),
-                _buildTab('Updates', isActive: false, activeColor: activeGreen),
-                _buildTab('Calls', isActive: false, activeColor: activeGreen),
-              ],
+          
+          // Chat View specific header element: Search Bar (Only shown on Chats tab)
+          if (_currentTabIndex == 0)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color:
+                    isDark ? const Color(0xFF202C33) : const Color(0xFFF0F2F5),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.search,
+                    color: isDark
+                        ? const Color(0xFF8696A0)
+                        : const Color(0xFF667781),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val;
+                        });
+                      },
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 14.5,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 10),
+                        border: InputBorder.none,
+                        hintText: isAr
+                            ? 'اسأل Meta AI أو ابحث'
+                            : 'Ask Meta AI or search',
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF8696A0)
+                              : const Color(0xFF667781),
+                          fontSize: 14.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          // Chats list
+
+          // Main Tab Body
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
+            child: _buildTabBody(isDark, isAr, chatRows),
+          ),
+        ],
+      ),
+      
+      // Floating Action Buttons (Meta AI + Chat FAB)
+      floatingActionButton: _currentTabIndex == 0
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                ...realSessions.map((s) {
-                  final hasMessages = s.messages.isNotEmpty;
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
-                      ? s.groupMembers 
-                      : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
-                  final lastMsgText = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
-                  final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
-                  final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
-
-                  final isBlocked = s.isBlocked || s.isBlockedMe;
-                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
-                  final isTyping = !isBlocked && s.contactUser.onlineStatus == UserOnlineStatus.typing;
-
-                  return _WhatsAppRow(
-                    name: s.contactUser.name,
-                    avatarBytes: s.contactUser.avatarBytes,
-                    message: isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
-                    time: lastMsgTime,
-                    unreadCount: s.unreadCount,
-                    isOnline: isOnline,
-                    isTyping: isTyping,
-                    isLastSenderMe: isMe,
-                    isGroup: s.isGroup,
-                    textPrimary: textPrimary,
-                    textSecondary: textSecondary,
-                    activeGreen: activeGreen,
-                    onTap: () {
-                      chatProvider.setActiveSession(s);
-                    },
-                  );
-                }),
-                // Render Mock chats to look complete
-                ...mockChats.map((m) {
-                  // Skip displaying mock if name already matches a real session
-                  if (realSessions.any((s) => s.contactUser.name == m['name'])) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return _WhatsAppRow(
-                    name: m['name'],
-                    avatarBytes: null,
-                    message: m['message'],
-                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
-                    unreadCount: m['unread'],
-                    isOnline: m['online'],
-                    isTyping: m['typing'],
-                    isLastSenderMe: false,
-                    textPrimary: textPrimary,
-                    textSecondary: textSecondary,
-                    activeGreen: activeGreen,
-                    onTap: () {
-                      // Dynamically bootstrap a new active chat session for this mock contact!
-                      chatProvider.createSessionCustom(
-                        platform: Platform.whatsapp,
-                        contactName: m['name'],
-                        initialMessages: [
-                          ChatMessage(
-                            id: 'init-mock',
-                            text: m['message'],
-                            isSender: false,
-                            timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
+                // Meta AI FAB (Gradient ring logo)
+                GestureDetector(
+                  onTap: () {
+                    // Action for Meta AI
+                  },
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1F2C34) : Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      // Meta AI gradient ring
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF3B82F6), // Blue
+                              Color(0xFF8B5CF6), // Purple
+                              Color(0xFFEC4899), // Pink
+                              Color(0xFF10B981), // Teal
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
-                      );
-                    },
-                  );
-                }),
+                        ),
+                        padding: const EdgeInsets.all(2.5), // Ring thickness
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color:
+                                isDark ? const Color(0xFF1F2C34) : Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Main Chat FAB
+                FloatingActionButton(
+                  onPressed: () {
+                    // Show platform dialog or session creator
+                  },
+                  backgroundColor: isDark
+                      ? const Color(0xFF00A884)
+                      : const Color(0xFF008069),
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.add_comment_rounded, // Matches chat message plus icon
+                    color: isDark ? const Color(0xFF0B141A) : Colors.white,
+                    size: 22,
+                  ),
+                ),
               ],
+            )
+          : null,
+
+      // Custom Bottom Navigation Bar matching modern WhatsApp
+      bottomNavigationBar: _buildBottomNavBar(context, isDark, isAr),
+    );
+  }
+
+  Widget _buildTabBody(bool isDark, bool isAr, List<Widget> chatRows) {
+    switch (_currentTabIndex) {
+      case 0:
+        return ListView(
+          padding: EdgeInsets.zero,
+          children: chatRows,
+        );
+      case 1:
+        return _buildUpdatesTab(isDark, isAr);
+      case 2:
+        return _buildCommunitiesTab(isDark, isAr);
+      case 3:
+        return _buildCallsTab(isDark, isAr);
+      default:
+        return Container();
+    }
+  }
+
+  Widget _buildBottomNavBar(BuildContext context, bool isDark, bool isAr) {
+    final navBg = isDark ? const Color(0xFF0B141A) : Colors.white;
+    final borderCol =
+        isDark ? const Color(0xFF202C33) : const Color(0xFFE9EDF0);
+
+    return Container(
+      height: 72,
+      decoration: BoxDecoration(
+        color: navBg,
+        border: Border(
+          top: BorderSide(color: borderCol, width: 1),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(
+            index: 0,
+            icon: Icons.chat_outlined,
+            activeIcon: Icons.chat_rounded,
+            label: isAr ? 'الدردشات' : 'Chats',
+            badgeText: '2',
+            isSelected: _currentTabIndex == 0,
+            isDark: isDark,
+          ),
+          _buildNavItem(
+            index: 1,
+            icon: Icons.circle_notifications_outlined,
+            activeIcon: Icons.circle_notifications_rounded,
+            label: isAr ? 'التحديثات' : 'Updates',
+            hasDotBadge: true,
+            isSelected: _currentTabIndex == 1,
+            isDark: isDark,
+          ),
+          _buildNavItem(
+            index: 2,
+            icon: Icons.groups_outlined,
+            activeIcon: Icons.groups_rounded,
+            label: isAr ? 'المجتمعات' : 'Communities',
+            isSelected: _currentTabIndex == 2,
+            isDark: isDark,
+          ),
+          _buildNavItem(
+            index: 3,
+            icon: Icons.call_outlined,
+            activeIcon: Icons.call,
+            label: isAr ? 'المكالمات' : 'Calls',
+            isSelected: _currentTabIndex == 3,
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+    String? badgeText,
+    bool hasDotBadge = false,
+    required bool isSelected,
+    required bool isDark,
+  }) {
+    final textActiveColor =
+        isDark ? const Color(0xFFE9EDF0) : const Color(0xFF0F181F);
+    final unselectedColor =
+        isDark ? const Color(0xFF8696A0) : const Color(0xFF667781);
+    final pillColor = isSelected
+        ? (isDark ? const Color(0xFF103629) : const Color(0xFFD9FDD3))
+        : Colors.transparent;
+
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _currentTabIndex = index;
+          });
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: pillColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    isSelected ? activeIcon : icon,
+                    color: isSelected
+                        ? (isDark
+                            ? const Color(0xFF00A884)
+                            : const Color(0xFF008069))
+                        : unselectedColor,
+                    size: 22,
+                  ),
+                ),
+                if (badgeText != null)
+                  Positioned(
+                    top: -4,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF25D366),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Center(
+                        child: Text(
+                          badgeText,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (hasDotBadge)
+                  Positioned(
+                    top: -2,
+                    right: 4,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF25D366),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? textActiveColor : unselectedColor,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpdatesTab(bool isDark, bool isAr) {
+    final textCol = isDark ? Colors.white : Colors.black;
+
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        Text(
+          isAr ? 'الحالة' : 'Status',
+          style: TextStyle(
+              color: textCol, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildStatusItem(isAr ? 'الحالة الخاصة بي' : 'My Status',
+                  widget.session.fakeAvatarBytes, true, isDark),
+              const SizedBox(width: 14),
+              _buildStatusItem('Orange Egypt', null, false, isDark),
+              const SizedBox(width: 14),
+              _buildStatusItem('معتز', null, false, isDark),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          isAr ? 'القنوات المقترحة' : 'Suggested Channels',
+          style: TextStyle(
+              color: textCol, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        _buildChannelRow('WhatsApp', isDark, isAr),
+        _buildChannelRow('Meta AI', isDark, isAr),
+      ],
+    );
+  }
+
+  Widget _buildStatusItem(
+      String name, Uint8List? avatarBytes, bool isMe, bool isDark) {
+    final activeColor =
+        isDark ? const Color(0xFF00A884) : const Color(0xFF008069);
+    return Column(
+      children: [
+        Stack(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: isMe ? Colors.transparent : activeColor, width: 2),
+              ),
+              child: _InboxAvatar(
+                name: name,
+                avatar: avatarBytes,
+                size: 52,
+                fallbackBg: activeColor.withValues(alpha: 0.15),
+                fallbackText: activeColor,
+              ),
+            ),
+            if (isMe)
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: activeColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: isDark ? const Color(0xFF0B141A) : Colors.white,
+                        width: 2),
+                  ),
+                  child: const Icon(Icons.add, size: 12, color: Colors.white),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          name,
+          style: TextStyle(
+              color: isDark ? Colors.white : Colors.black, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChannelRow(String name, bool isDark, bool isAr) {
+    final textCol = isDark ? Colors.white : Colors.black;
+    final secCol = isDark ? const Color(0xFF8696A0) : const Color(0xFF667781);
+    final activeColor =
+        isDark ? const Color(0xFF00A884) : const Color(0xFF008069);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: activeColor.withValues(alpha: 0.2),
+            child: Text(name[0], style: TextStyle(color: activeColor)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: TextStyle(
+                        color: textCol,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14)),
+                Text(isAr ? 'قناة رسمية' : 'Official channel',
+                    style: TextStyle(color: secCol, fontSize: 12)),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: activeColor.withValues(alpha: 0.2),
+              foregroundColor: activeColor,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            child: Text(isAr ? 'متابعة' : 'Follow',
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommunitiesTab(bool isDark, bool isAr) {
+    final textCol = isDark ? Colors.white : Colors.black;
+    final secCol = isDark ? const Color(0xFF8696A0) : const Color(0xFF667781);
+    final activeColor =
+        isDark ? const Color(0xFF00A884) : const Color(0xFF008069);
+
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.groups_rounded, size: 80, color: secCol),
+          const SizedBox(height: 16),
+          Text(
+            isAr ? 'تواصل مع المجتمعات' : 'Stay connected with communities',
+            style: TextStyle(
+                color: textCol, fontSize: 18, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isAr
+                ? 'تجمع المجتمعات الأعضاء في مجموعات مشتركة الاهتمامات وتتيح تنظيم المجموعات وإرسال الإعلانات بسهولة.'
+                : 'Communities bring members together in topic-based groups, making it easy to organize and send announcements.',
+            style: TextStyle(color: secCol, fontSize: 13, height: 1.4),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: activeColor,
+              foregroundColor: isDark ? const Color(0xFF0B141A) : Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              isAr ? 'بدء مجتمع جديد' : 'Start your new community',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -329,27 +940,97 @@ class _WhatsAppInbox extends StatelessWidget {
     );
   }
 
-  Widget _buildTab(String label, {required bool isActive, required Color activeColor}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isActive ? Colors.white : Colors.transparent,
-              width: 3,
+  Widget _buildCallsTab(bool isDark, bool isAr) {
+    final textCol = isDark ? Colors.white : Colors.black;
+    final secCol = isDark ? const Color(0xFF8696A0) : const Color(0xFF667781);
+
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: Color(0xFF25D366),
+              child: Icon(Icons.link, color: Colors.white),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isAr ? 'إنشاء رابط مكالمة' : 'Create call link',
+                  style: TextStyle(
+                      color: textCol,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15),
+                ),
+                Text(
+                  isAr
+                      ? 'شارك رابطًا لمكالمة واتساب'
+                      : 'Share a link for your WhatsApp call',
+                  style: TextStyle(color: secCol, fontSize: 13),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Text(
+          isAr ? 'المكالمات الأخيرة' : 'Recent calls',
+          style: TextStyle(
+              color: textCol, fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        _buildCallLogItem('معتز', true, false,
+            isAr ? 'أمس، 8:40 م' : 'Yesterday, 8:40 PM', isDark),
+        _buildCallLogItem('Orange Egypt', false, true, '24/05/2026', isDark),
+      ],
+    );
+  }
+
+  Widget _buildCallLogItem(
+      String name, bool isVideo, bool isMissed, String time, bool isDark) {
+    final textCol = isDark ? Colors.white : Colors.black;
+    final secCol = isDark ? const Color(0xFF8696A0) : const Color(0xFF667781);
+    final activeColor =
+        isDark ? const Color(0xFF00A884) : const Color(0xFF008069);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: activeColor.withValues(alpha: 0.15),
+            child: Icon(Icons.person, color: activeColor),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: TextStyle(
+                        color: textCol,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+                Row(
+                  children: [
+                    Icon(
+                      isMissed ? Icons.call_missed : Icons.call_received,
+                      color: isMissed ? Colors.red : Colors.green,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(time, style: TextStyle(color: secCol, fontSize: 12)),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.white : Colors.white70,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
+          Icon(
+            isVideo ? Icons.videocam_rounded : Icons.call,
+            color: activeColor,
           ),
-        ),
+        ],
       ),
     );
   }
@@ -364,10 +1045,13 @@ class _WhatsAppRow extends StatelessWidget {
   final bool isOnline;
   final bool isTyping;
   final bool isLastSenderMe;
+  final bool isLastMessageRead;
+  final bool isDisappearing;
   final bool isGroup;
   final Color textPrimary;
   final Color textSecondary;
   final Color activeGreen;
+  final bool isDark;
   final VoidCallback onTap;
 
   const _WhatsAppRow({
@@ -379,29 +1063,63 @@ class _WhatsAppRow extends StatelessWidget {
     required this.isOnline,
     required this.isTyping,
     required this.isLastSenderMe,
+    required this.isLastMessageRead,
+    required this.isDisappearing,
     this.isGroup = false,
     required this.textPrimary,
     required this.textSecondary,
     required this.activeGreen,
+    required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final showGreenText = unreadCount > 0 || isTyping;
+    final doubleCheckColor =
+        isLastMessageRead ? const Color(0xFF53BDEB) : textSecondary;
 
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      leading: _InboxAvatar(
-        name: name,
-        avatar: avatarBytes,
-        size: 48,
-        fallbackBg: activeGreen.withValues(alpha: 0.15),
-        fallbackText: activeGreen,
-        isOnline: isOnline,
-        showOnlineDot: !isGroup,
-        isGroup: isGroup,
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          _InboxAvatar(
+            name: name,
+            avatar: avatarBytes,
+            size: 48,
+            fallbackBg: activeGreen.withValues(alpha: 0.15),
+            fallbackText: activeGreen,
+            isOnline: isOnline,
+            showOnlineDot: !isGroup && !isDisappearing,
+            isGroup: isGroup,
+          ),
+          if (isDisappearing)
+            Positioned(
+              bottom: -2,
+              right: -2,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0B141A) : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF0B141A) : Colors.white,
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.access_time_rounded,
+                  size: 12,
+                  color: isDark
+                      ? const Color(0xFF8696A0)
+                      : const Color(0xFF667781),
+                ),
+              ),
+            ),
+        ],
       ),
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -429,7 +1147,7 @@ class _WhatsAppRow extends StatelessWidget {
         child: Row(
           children: [
             if (isLastSenderMe && !isTyping) ...[
-              Icon(Icons.done_all, color: activeGreen, size: 16.5),
+              Icon(Icons.done_all, color: doubleCheckColor, size: 16.5),
               const SizedBox(width: 4),
             ],
             Expanded(
@@ -481,7 +1199,9 @@ class _MessengerInbox extends StatelessWidget {
     final isAr = Provider.of<ThemeProvider>(context).isArabic;
     final chatProvider = Provider.of<ChatProvider>(context);
 
-    final realSessions = chatProvider.sessions.where((s) => s.platform == Platform.messenger).toList();
+    final realSessions = chatProvider.sessions
+        .where((s) => s.platform == Platform.messenger)
+        .toList();
 
     // Default mock data for Messenger
     final List<Map<String, dynamic>> mockChats = [
@@ -517,7 +1237,8 @@ class _MessengerInbox extends StatelessWidget {
     final Color primaryBg = isDark ? Colors.black : Colors.white;
     final Color textPrimary = isDark ? Colors.white : Colors.black;
     final Color textSecondary = isDark ? Colors.white60 : Colors.black54;
-    final Color searchBg = isDark ? const Color(0xFF1C1B1F) : const Color(0xFFF0F2F5);
+    final Color searchBg =
+        isDark ? const Color(0xFF1C1B1F) : const Color(0xFFF0F2F5);
     final Color activeBlue = const Color(0xFF0084FF);
 
     return Scaffold(
@@ -598,14 +1319,16 @@ class _MessengerInbox extends StatelessWidget {
                   return _buildActiveFriendBubble(
                     s.contactUser.name,
                     s.contactUser.avatarBytes,
-                    s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing,
+                    s.contactUser.onlineStatus == UserOnlineStatus.online ||
+                        s.contactUser.onlineStatus == UserOnlineStatus.typing,
                     textPrimary,
                     activeBlue,
                   );
                 }),
                 // Mock contacts
                 ...mockChats.map((m) {
-                  if (realSessions.any((s) => s.contactUser.name == m['name'])) {
+                  if (realSessions
+                      .any((s) => s.contactUser.name == m['name'])) {
                     return const SizedBox.shrink();
                   }
                   return _buildActiveFriendBubble(
@@ -627,21 +1350,34 @@ class _MessengerInbox extends StatelessWidget {
               children: [
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
-                      ? s.groupMembers 
-                      : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
-                  final lastMsgText = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
-                  final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
-                  final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
+                  final defaultLastMsgText =
+                      s.isGroup && s.groupMembers.isNotEmpty
+                          ? s.groupMembers
+                          : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
+                  final lastMsgText = s.customLastMessage ??
+                      (hasMessages ? s.messages.last.text : defaultLastMsgText);
+                  final lastMsgTime = s.customLastMessageTime ??
+                      (hasMessages
+                          ? s.messages.last.formattedTime
+                          : s.fakeTime);
+                  final isMe = s.lastMessageIsSender ??
+                      (hasMessages && s.messages.last.isSender);
 
                   final isBlocked = s.isBlocked || s.isBlockedMe;
-                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
-                  final isTyping = !isBlocked && s.contactUser.onlineStatus == UserOnlineStatus.typing;
+                  final isOnline = !isBlocked &&
+                      !s.isGroup &&
+                      (s.contactUser.onlineStatus == UserOnlineStatus.online ||
+                          s.contactUser.onlineStatus ==
+                              UserOnlineStatus.typing);
+                  final isTyping = !isBlocked &&
+                      s.contactUser.onlineStatus == UserOnlineStatus.typing;
 
                   return _MessengerRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
+                    message: isTyping
+                        ? (isAr ? 'يكتب الآن...' : 'typing...')
+                        : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
                     isOnline: isOnline,
@@ -658,7 +1394,8 @@ class _MessengerInbox extends StatelessWidget {
                 }),
                 // Mock Messenger Chats
                 ...mockChats.map((m) {
-                  if (realSessions.any((s) => s.contactUser.name == m['name'])) {
+                  if (realSessions
+                      .any((s) => s.contactUser.name == m['name'])) {
                     return const SizedBox.shrink();
                   }
 
@@ -666,7 +1403,8 @@ class _MessengerInbox extends StatelessWidget {
                     name: m['name'],
                     avatarBytes: null,
                     message: m['message'],
-                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
+                    time:
+                        LanguageHelper.translate(m['time'].toLowerCase(), isAr),
                     isUnread: m['unread'],
                     isOnline: m['online'],
                     isTyping: m['typing'],
@@ -683,7 +1421,8 @@ class _MessengerInbox extends StatelessWidget {
                             id: 'init-mock',
                             text: m['message'],
                             isSender: m['me'],
-                            timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
+                            timestamp: DateTime.now()
+                                .subtract(const Duration(minutes: 10)),
                           ),
                         ],
                       );
@@ -698,7 +1437,8 @@ class _MessengerInbox extends StatelessWidget {
     );
   }
 
-  Widget _buildActiveFriendBubble(String name, Uint8List? avatarBytes, bool isOnline, Color textColor, Color activeColor) {
+  Widget _buildActiveFriendBubble(String name, Uint8List? avatarBytes,
+      bool isOnline, Color textColor, Color activeColor) {
     final firstName = name.split(' ')[0];
     return Container(
       margin: const EdgeInsets.only(right: 14),
@@ -789,7 +1529,9 @@ class _MessengerRow extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                isLastSenderMe && !isTyping ? '${LanguageHelper.translate('you', isAr)}: $message' : message,
+                isLastSenderMe && !isTyping
+                    ? '${LanguageHelper.translate('you', isAr)}: $message'
+                    : message,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -850,7 +1592,9 @@ class _InstagramInbox extends StatelessWidget {
     final isAr = Provider.of<ThemeProvider>(context).isArabic;
     final chatProvider = Provider.of<ChatProvider>(context);
 
-    final realSessions = chatProvider.sessions.where((s) => s.platform == Platform.instagram).toList();
+    final realSessions = chatProvider.sessions
+        .where((s) => s.platform == Platform.instagram)
+        .toList();
 
     // Default mock data for Instagram
     final List<Map<String, dynamic>> mockChats = [
@@ -883,9 +1627,11 @@ class _InstagramInbox extends StatelessWidget {
     final Color primaryBg = isDark ? Colors.black : Colors.white;
     final Color textPrimary = isDark ? Colors.white : Colors.black;
     final Color textSecondary = isDark ? Colors.grey[400]! : Colors.grey[600]!;
-    final Color searchBg = isDark ? const Color(0xFF262626) : const Color(0xFFEFEFEF);
+    final Color searchBg =
+        isDark ? const Color(0xFF262626) : const Color(0xFFEFEFEF);
     final Color activePink = const Color(0xFFE1306C);
-    final Color noteBubbleBg = isDark ? const Color(0xFF262626) : const Color(0xFFF2F2F2);
+    final Color noteBubbleBg =
+        isDark ? const Color(0xFF262626) : const Color(0xFFF2F2F2);
 
     return Scaffold(
       backgroundColor: primaryBg,
@@ -947,7 +1693,11 @@ class _InstagramInbox extends StatelessWidget {
                   return _buildInstagramNoteBubble(
                     s.contactUser.name,
                     s.contactUser.avatarBytes,
-                    !isBlocked && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing),
+                    !isBlocked &&
+                        (s.contactUser.onlineStatus ==
+                                UserOnlineStatus.online ||
+                            s.contactUser.onlineStatus ==
+                                UserOnlineStatus.typing),
                     isBlocked ? '' : 'Online',
                     textPrimary,
                     activePink,
@@ -956,7 +1706,8 @@ class _InstagramInbox extends StatelessWidget {
                 }),
                 // Mock contacts notes
                 ...mockChats.map((m) {
-                  if (realSessions.any((s) => s.contactUser.name == m['name'])) {
+                  if (realSessions
+                      .any((s) => s.contactUser.name == m['name'])) {
                     return const SizedBox.shrink();
                   }
                   return _buildInstagramNoteBubble(
@@ -980,21 +1731,34 @@ class _InstagramInbox extends StatelessWidget {
                 // Real Instagram Sessions
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
-                      ? s.groupMembers 
-                      : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
-                  final lastMsgText = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
-                  final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
-                  final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
+                  final defaultLastMsgText =
+                      s.isGroup && s.groupMembers.isNotEmpty
+                          ? s.groupMembers
+                          : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
+                  final lastMsgText = s.customLastMessage ??
+                      (hasMessages ? s.messages.last.text : defaultLastMsgText);
+                  final lastMsgTime = s.customLastMessageTime ??
+                      (hasMessages
+                          ? s.messages.last.formattedTime
+                          : s.fakeTime);
+                  final isMe = s.lastMessageIsSender ??
+                      (hasMessages && s.messages.last.isSender);
 
                   final isBlocked = s.isBlocked || s.isBlockedMe;
-                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
-                  final isTyping = !isBlocked && s.contactUser.onlineStatus == UserOnlineStatus.typing;
+                  final isOnline = !isBlocked &&
+                      !s.isGroup &&
+                      (s.contactUser.onlineStatus == UserOnlineStatus.online ||
+                          s.contactUser.onlineStatus ==
+                              UserOnlineStatus.typing);
+                  final isTyping = !isBlocked &&
+                      s.contactUser.onlineStatus == UserOnlineStatus.typing;
 
                   return _InstagramRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
+                    message: isTyping
+                        ? (isAr ? 'يكتب الآن...' : 'typing...')
+                        : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
                     isOnline: isOnline,
@@ -1011,7 +1775,8 @@ class _InstagramInbox extends StatelessWidget {
                 }),
                 // Mock Instagram Chats
                 ...mockChats.map((m) {
-                  if (realSessions.any((s) => s.contactUser.name == m['name'])) {
+                  if (realSessions
+                      .any((s) => s.contactUser.name == m['name'])) {
                     return const SizedBox.shrink();
                   }
 
@@ -1019,7 +1784,8 @@ class _InstagramInbox extends StatelessWidget {
                     name: m['name'],
                     avatarBytes: null,
                     message: m['message'],
-                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
+                    time:
+                        LanguageHelper.translate(m['time'].toLowerCase(), isAr),
                     isUnread: m['unread'],
                     isOnline: m['online'],
                     isTyping: false,
@@ -1036,7 +1802,8 @@ class _InstagramInbox extends StatelessWidget {
                             id: 'init-mock',
                             text: m['message'],
                             isSender: false,
-                            timestamp: DateTime.now().subtract(const Duration(hours: 1)),
+                            timestamp: DateTime.now()
+                                .subtract(const Duration(hours: 1)),
                           ),
                         ],
                       );
@@ -1051,7 +1818,14 @@ class _InstagramInbox extends StatelessWidget {
     );
   }
 
-  Widget _buildInstagramNoteBubble(String name, Uint8List? avatarBytes, bool isOnline, String noteText, Color textColor, Color activeColor, Color bubbleBg) {
+  Widget _buildInstagramNoteBubble(
+      String name,
+      Uint8List? avatarBytes,
+      bool isOnline,
+      String noteText,
+      Color textColor,
+      Color activeColor,
+      Color bubbleBg) {
     final firstName = name.split('_')[0];
     final hasNote = noteText.isNotEmpty;
 
@@ -1069,7 +1843,8 @@ class _InstagramInbox extends StatelessWidget {
                 fallbackBg: activeColor.withValues(alpha: 0.15),
                 fallbackText: activeColor,
                 isOnline: isOnline,
-                showOnlineDot: !hasNote, // Only show green dot if note bubble is not taking up the space
+                showOnlineDot:
+                    !hasNote, // Only show green dot if note bubble is not taking up the space
               ),
               if (hasNote)
                 Positioned(
@@ -1077,7 +1852,8 @@ class _InstagramInbox extends StatelessWidget {
                   left: 4,
                   right: 4,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
                       color: bubbleBg,
                       borderRadius: BorderRadius.circular(10),
@@ -1091,7 +1867,10 @@ class _InstagramInbox extends StatelessWidget {
                     ),
                     child: Text(
                       noteText,
-                      style: TextStyle(color: textColor, fontSize: 8.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: textColor,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w600),
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1176,7 +1955,9 @@ class _InstagramRow extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                isLastSenderMe && !isTyping ? '${LanguageHelper.translate('sent', isAr)} $message' : message,
+                isLastSenderMe && !isTyping
+                    ? '${LanguageHelper.translate('sent', isAr)} $message'
+                    : message,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1225,7 +2006,9 @@ class _SnapchatInbox extends StatelessWidget {
     final isAr = Provider.of<ThemeProvider>(context).isArabic;
     final chatProvider = Provider.of<ChatProvider>(context);
 
-    final realSessions = chatProvider.sessions.where((s) => s.platform == Platform.snapchat).toList();
+    final realSessions = chatProvider.sessions
+        .where((s) => s.platform == Platform.snapchat)
+        .toList();
 
     // Default mock data for Snapchat
     final List<Map<String, dynamic>> mockChats = [
@@ -1258,7 +2041,8 @@ class _SnapchatInbox extends StatelessWidget {
     final Color primaryBg = isDark ? const Color(0xFF0B0C0E) : Colors.white;
     final Color textPrimary = isDark ? Colors.white : Colors.black;
     final Color textSecondary = isDark ? Colors.white60 : Colors.black54;
-    final Color searchBg = isDark ? const Color(0xFF242528) : const Color(0xFFF0F1F2);
+    final Color searchBg =
+        isDark ? const Color(0xFF242528) : const Color(0xFFF0F1F2);
     final Color activeYellow = const Color(0xFFFFFC00);
 
     return Scaffold(
@@ -1302,7 +2086,8 @@ class _SnapchatInbox extends StatelessWidget {
                     color: searchBg,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.person_add_outlined, color: textPrimary, size: 20),
+                  child: Icon(Icons.person_add_outlined,
+                      color: textPrimary, size: 20),
                 ),
                 const SizedBox(width: 8),
                 Container(
@@ -1311,7 +2096,8 @@ class _SnapchatInbox extends StatelessWidget {
                     color: searchBg,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.chat_bubble_outline_rounded, color: textPrimary, size: 20),
+                  child: Icon(Icons.chat_bubble_outline_rounded,
+                      color: textPrimary, size: 20),
                 ),
               ],
             ),
@@ -1326,34 +2112,51 @@ class _SnapchatInbox extends StatelessWidget {
                 // Real Snapchat Sessions
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
-                  final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
-                  
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
-                      ? s.groupMembers 
-                      : (isAr ? 'دردشة جديدة' : 'New Chat');
-                  final msg = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
-                  
+                  final isMe = s.lastMessageIsSender ??
+                      (hasMessages && s.messages.last.isSender);
+
+                  final defaultLastMsgText =
+                      s.isGroup && s.groupMembers.isNotEmpty
+                          ? s.groupMembers
+                          : (isAr ? 'دردشة جديدة' : 'New Chat');
+                  final msg = s.customLastMessage ??
+                      (hasMessages ? s.messages.last.text : defaultLastMsgText);
+
                   String snapStatus;
-                  final isSnap = msg.toLowerCase().contains('snap') || (hasMessages && s.messages.last.type == MessageType.image);
-                  
+                  final isSnap = msg.toLowerCase().contains('snap') ||
+                      (hasMessages &&
+                          s.messages.last.type == MessageType.image);
+
                   if (s.unreadCount > 0) {
-                    snapStatus = isSnap ? 'received_snap_unread' : 'received_chat_unread';
+                    snapStatus = isSnap
+                        ? 'received_snap_unread'
+                        : 'received_chat_unread';
                   } else {
                     if (isMe) {
                       snapStatus = isSnap ? 'sent_snap_read' : 'sent_chat_read';
                     } else {
-                      snapStatus = isSnap ? 'received_snap_read' : 'received_chat_read';
+                      snapStatus =
+                          isSnap ? 'received_snap_read' : 'received_chat_read';
                     }
                   }
 
                   final isBlocked = s.isBlocked || s.isBlockedMe;
-                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
+                  final isOnline = !isBlocked &&
+                      !s.isGroup &&
+                      (s.contactUser.onlineStatus == UserOnlineStatus.online ||
+                          s.contactUser.onlineStatus ==
+                              UserOnlineStatus.typing);
 
                   return _SnapchatRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
                     message: msg,
-                    time: s.customLastMessageTime != null ? LanguageHelper.translate(s.customLastMessageTime!.toLowerCase(), isAr) : (hasMessages ? s.messages.last.formattedTime : s.fakeTime),
+                    time: s.customLastMessageTime != null
+                        ? LanguageHelper.translate(
+                            s.customLastMessageTime!.toLowerCase(), isAr)
+                        : (hasMessages
+                            ? s.messages.last.formattedTime
+                            : s.fakeTime),
                     streak: 0,
                     statusType: snapStatus,
                     isOnline: isOnline,
@@ -1367,7 +2170,8 @@ class _SnapchatInbox extends StatelessWidget {
                 }),
                 // Mock Snapchat Chats
                 ...mockChats.map((m) {
-                  if (realSessions.any((s) => s.contactUser.name == m['name'])) {
+                  if (realSessions
+                      .any((s) => s.contactUser.name == m['name'])) {
                     return const SizedBox.shrink();
                   }
 
@@ -1375,7 +2179,8 @@ class _SnapchatInbox extends StatelessWidget {
                     name: m['name'],
                     avatarBytes: null,
                     message: m['message'],
-                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
+                    time:
+                        LanguageHelper.translate(m['time'].toLowerCase(), isAr),
                     streak: m['streak'],
                     statusType: m['status'],
                     isOnline: m['online'],
@@ -1390,7 +2195,8 @@ class _SnapchatInbox extends StatelessWidget {
                             id: 'init-mock',
                             text: 'Hey!',
                             isSender: false,
-                            timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+                            timestamp: DateTime.now()
+                                .subtract(const Duration(hours: 2)),
                           ),
                         ],
                       );
@@ -1453,7 +2259,9 @@ class _SnapchatRow extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: textPrimary.withValues(alpha: 0.04), width: 0.8)),
+        border: Border(
+            bottom: BorderSide(
+                color: textPrimary.withValues(alpha: 0.04), width: 0.8)),
       ),
       child: ListTile(
         onTap: onTap,
@@ -1482,7 +2290,10 @@ class _SnapchatRow extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 '🔥 $streak',
-                style: TextStyle(color: textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold),
               ),
             ],
           ],
@@ -1493,12 +2304,16 @@ class _SnapchatRow extends StatelessWidget {
             children: [
               _buildSnapchatStatusIcon(),
               const SizedBox(width: 6),
-              Text(
-                displayedMsg,
-                style: TextStyle(
-                  color: _statusColor(statusType),
-                  fontWeight: showBold ? FontWeight.w900 : FontWeight.bold,
-                  fontSize: 12.5,
+              Expanded(
+                child: Text(
+                  displayedMsg,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _statusColor(statusType),
+                    fontWeight: showBold ? FontWeight.w900 : FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
                 ),
               ),
               const SizedBox(width: 6),

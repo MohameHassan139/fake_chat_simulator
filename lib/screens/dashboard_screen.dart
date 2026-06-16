@@ -22,8 +22,8 @@ class DashboardScreen extends StatelessWidget {
             children: [
               TextSpan(
                 text: LanguageHelper.translate('app_title_1', themeProvider.isArabic),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -1,
@@ -91,17 +91,24 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 24),
           Text(
             LanguageHelper.translate('no_chats_yet', themeProvider.isArabic),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             LanguageHelper.translate('tap_plus_to_create', themeProvider.isArabic),
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 15, color: Colors.white54, height: 1.5),
+            style: TextStyle(
+              fontSize: 15,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.5),
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 32),
           _buildPlatformCards(context),
@@ -131,10 +138,13 @@ class DashboardScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
           child: Text(
             LanguageHelper.translate('my_conversations', themeProvider.isArabic).toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.white38,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.35),
               letterSpacing: 1,
             ),
           ),
@@ -195,10 +205,13 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final onSurface = colorScheme.onSurface;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: const Color(0xFF1A1A1A),
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onTap,
@@ -229,10 +242,10 @@ class _SessionCard extends StatelessWidget {
                         children: [
                           Text(
                             session.contactUser.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: onSurface,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -256,17 +269,27 @@ class _SessionCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         '${session.messages.length} ${LanguageHelper.translate('messages', context.read<ThemeProvider>().isArabic)}',
-                        style: const TextStyle(fontSize: 13, color: Colors.white38),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: onSurface.withValues(alpha: 0.35),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 // Actions
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.white24, size: 20),
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: onSurface.withValues(alpha: 0.25),
+                    size: 20,
+                  ),
                   onPressed: onDelete,
                 ),
-                const Icon(Icons.chevron_right_rounded, color: Colors.white24),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: onSurface.withValues(alpha: 0.25),
+                ),
               ],
             ),
           ),
@@ -292,10 +315,13 @@ class _SessionCard extends StatelessWidget {
 class _NewChatSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final onSurface = colorScheme.onSurface;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -307,7 +333,7 @@ class _NewChatSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -315,16 +341,17 @@ class _NewChatSheet extends StatelessWidget {
           const SizedBox(height: 20),
           Text(
             LanguageHelper.translate('choose_platform', context.read<ThemeProvider>().isArabic),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: onSurface,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             LanguageHelper.translate('select_messaging_app', context.read<ThemeProvider>().isArabic),
-            style: const TextStyle(fontSize: 14, color: Colors.white38),
+            style: TextStyle(
+                fontSize: 14, color: onSurface.withValues(alpha: 0.4)),
           ),
           const SizedBox(height: 24),
           ...Platform.values.map((p) => _PlatformListTile(platform: p)),
@@ -342,11 +369,15 @@ class _PlatformListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chatProvider = context.read<ChatProvider>();
+    final colorScheme = Theme.of(context).colorScheme;
+    final onSurface = colorScheme.onSurface;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: const Color(0xFF242424),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF242424)
+            : const Color(0xFFEEEEEE),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -377,20 +408,27 @@ class _PlatformListTile extends StatelessWidget {
                   children: [
                     Text(
                       _name(platform),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: onSurface,
                       ),
                     ),
                     Text(
                       _desc(platform),
-                      style: const TextStyle(fontSize: 12, color: Colors.white38),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: onSurface.withValues(alpha: 0.4),
+                      ),
                     ),
                   ],
                 ),
                 const Spacer(),
-                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white24),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: onSurface.withValues(alpha: 0.25),
+                ),
               ],
             ),
           ),
