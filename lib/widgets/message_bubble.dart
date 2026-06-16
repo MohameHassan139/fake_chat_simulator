@@ -4,6 +4,12 @@ import '../models/chat_models.dart';
 import '../themes/platform_themes.dart';
 import '../providers/theme_provider.dart';
 
+bool _isArabic(String text) {
+  final arabicRegExp = RegExp(
+      r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]');
+  return arabicRegExp.hasMatch(text);
+}
+
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final ChatUser contactUser;
@@ -11,6 +17,7 @@ class MessageBubble extends StatelessWidget {
   final PlatformTheme platformTheme;
   final bool isFirstInGroup;
   final bool isLastInGroup;
+  final bool isBlockedMe;
 
   const MessageBubble({
     super.key,
@@ -20,6 +27,7 @@ class MessageBubble extends StatelessWidget {
     required this.platformTheme,
     required this.isFirstInGroup,
     required this.isLastInGroup,
+    this.isBlockedMe = false,
   });
 
   @override
@@ -55,10 +63,31 @@ class MessageBubble extends StatelessWidget {
         // Instagram: no "Seen" indicator
       } else {
         // Snapchat
-        externalIndicator = Padding(
-          padding: const EdgeInsets.only(bottom: 2),
-          child: _StatusTick(status: message.status, platformTheme: platformTheme),
-        );
+        if (isBlockedMe) {
+          externalIndicator = const Padding(
+            padding: EdgeInsets.only(bottom: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.play_arrow_outlined, size: 14, color: Colors.grey),
+                SizedBox(width: 4),
+                Text(
+                  'Pending',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          externalIndicator = Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: _StatusTick(status: message.status, platformTheme: platformTheme),
+          );
+        }
       }
     }
 
@@ -165,6 +194,11 @@ class MessageBubble extends StatelessWidget {
 
     Widget bubbleContent;
 
+    final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+    final bool isRtl = isArabicLocale || _isArabic(message.text);
+    final hasReply =
+        message.repliedToId != null && message.repliedToText != null;
+
     switch (message.type) {
       case MessageType.text:
         bubbleContent = _TextContent(
@@ -172,6 +206,8 @@ class MessageBubble extends StatelessWidget {
           isSender: isSender,
           platform: platform,
           platformTheme: platformTheme,
+          hasReply: hasReply,
+          isBlockedMe: isBlockedMe,
         );
         break;
       case MessageType.image:
@@ -180,6 +216,7 @@ class MessageBubble extends StatelessWidget {
           isSender: isSender,
           platform: platform,
           platformTheme: platformTheme,
+          isBlockedMe: isBlockedMe,
         );
         break;
       case MessageType.audio:
@@ -188,6 +225,7 @@ class MessageBubble extends StatelessWidget {
           isSender: isSender,
           platform: platform,
           platformTheme: platformTheme,
+          isBlockedMe: isBlockedMe,
         );
         break;
       case MessageType.voiceCall:
@@ -197,6 +235,7 @@ class MessageBubble extends StatelessWidget {
           isSender: isSender,
           platform: platform,
           platformTheme: platformTheme,
+          isBlockedMe: isBlockedMe,
         );
         break;
       default:
@@ -205,33 +244,43 @@ class MessageBubble extends StatelessWidget {
           isSender: isSender,
           platform: platform,
           platformTheme: platformTheme,
+          isBlockedMe: isBlockedMe,
         );
     }
 
-    final hasReply = message.repliedToId != null && message.repliedToText != null;
     final finalContent = hasReply
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ReplyPreviewHeader(
-                repliedToText: message.repliedToText!,
-                repliedToSenderName: message.repliedToSenderName ?? 'Contact',
-                isSender: isSender,
-                platform: platform,
-                platformTheme: platformTheme,
-              ),
-              const SizedBox(height: 2),
-              bubbleContent,
-            ],
+        ? IntrinsicWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ReplyPreviewHeader(
+                  repliedToText: message.repliedToText!,
+                  repliedToSenderName: message.repliedToSenderName ?? 'Contact',
+                  isSender: isSender,
+                  platform: platform,
+                  platformTheme: platformTheme,
+                  bubbleIsRtl: isRtl,
+                ),
+                bubbleContent,
+              ],
+            ),
           )
         : bubbleContent;
 
     if (platform == Platform.whatsapp) {
-      final clipper = WhatsAppBubbleClipper(isSender: isSender, isFirstInGroup: isFirstInGroup);
-      final bubbleColor = isSender ? platformTheme.senderBubble : platformTheme.receiverBubble;
+      final clipper = WhatsAppBubbleClipper(
+          isSender: isSender, isFirstInGroup: isFirstInGroup);
+      final bubbleColor =
+          isSender ? platformTheme.senderBubble : platformTheme.receiverBubble;
 
-      return ClipPath(
+      // Tail side padding: the WhatsApp tail eats ~6px on its side
+      final double tailPad = isFirstInGroup ? 6.0 : 0.0;
+      final EdgeInsets outerPad = isSender
+          ? EdgeInsets.fromLTRB(10, 6, 10 + tailPad, 6)
+          : EdgeInsets.fromLTRB(10 + tailPad, 6, 10, 6);
+
+      final waBubble = ClipPath(
         clipper: clipper,
         child: PhysicalShape(
           clipper: clipper,
@@ -239,13 +288,21 @@ class MessageBubble extends StatelessWidget {
           elevation: 0.8,
           shadowColor: Colors.black.withOpacity(0.08),
           child: Padding(
-            padding: isSender
-                ? EdgeInsets.fromLTRB(10, 6, isFirstInGroup ? 16 : 10, 6)
-                : EdgeInsets.fromLTRB(isFirstInGroup ? 16 : 10, 6, 10, 6),
+            padding: outerPad,
             child: finalContent,
           ),
         ),
       );
+
+      // Constrain max width so reply bubbles don't stretch full screen width.
+      // Fixed cap of 260 works across the 280–390px phone frame range (~70%).
+      if (hasReply) {
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 260),
+          child: waBubble,
+        );
+      }
+      return waBubble;
     }
 
     return _BubbleContainer(
@@ -716,18 +773,17 @@ class _TextContent extends StatelessWidget {
   final bool isSender;
   final Platform platform;
   final PlatformTheme platformTheme;
+  final bool hasReply;
+  final bool isBlockedMe;
 
   const _TextContent({
     required this.message,
     required this.isSender,
     required this.platform,
     required this.platformTheme,
+    this.hasReply = false,
+    this.isBlockedMe = false,
   });
-
-  bool _isArabic(String text) {
-    final arabicRegExp = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]');
-    return arabicRegExp.hasMatch(text);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -745,6 +801,7 @@ class _TextContent extends StatelessWidget {
             ),
             child: Text(
               message.text,
+              textAlign: isRtl ? TextAlign.right : TextAlign.left,
               style: platformTheme.messageStyle.copyWith(color: textColor),
               textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
             ),
@@ -758,19 +815,24 @@ class _TextContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 if (isRtl && isSender) ...[
-                  _StatusTick(status: message.status, platformTheme: platformTheme),
+                  _StatusTick(
+                      status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
                   const SizedBox(width: 3),
                 ],
                 Text(
                   message.formattedTime,
                   style: platformTheme.timestampStyle.copyWith(
-                    color: platformTheme.chatBg == Colors.black || platformTheme.chatBg.value == 0xFF0B141A ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                    color: platformTheme.chatBg == Colors.black ||
+                            platformTheme.chatBg.value == 0xFF0B141A
+                        ? const Color(0xFF8696A0)
+                        : const Color(0xFF667781),
                     fontSize: 10.5,
                   ),
                 ),
                 if (!isRtl && isSender) ...[
                   const SizedBox(width: 3),
-                  _StatusTick(status: message.status, platformTheme: platformTheme),
+                  _StatusTick(
+                      status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
                 ],
               ],
             ),
@@ -784,6 +846,7 @@ class _TextContent extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Text(
           message.text,
+          textAlign: isRtl ? TextAlign.right : TextAlign.left,
           style: platformTheme.messageStyle.copyWith(color: textColor),
           textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
         ),
@@ -793,17 +856,20 @@ class _TextContent extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
       child: Column(
-        crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Text(
             message.text,
+            textAlign: isRtl ? TextAlign.right : TextAlign.left,
             style: platformTheme.messageStyle.copyWith(color: textColor),
             textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
           ),
           const SizedBox(height: 2),
           Row(
             mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: isRtl ? MainAxisAlignment.start : MainAxisAlignment.end,
+            mainAxisAlignment:
+                isRtl ? MainAxisAlignment.start : MainAxisAlignment.end,
             children: [
               Text(
                 message.formattedTime,
@@ -830,12 +896,14 @@ class _ImageContent extends StatelessWidget {
   final bool isSender;
   final Platform platform;
   final PlatformTheme platformTheme;
+  final bool isBlockedMe;
 
   const _ImageContent({
     required this.message,
     required this.isSender,
     required this.platform,
     required this.platformTheme,
+    this.isBlockedMe = false,
   });
 
   @override
@@ -891,7 +959,7 @@ class _ImageContent extends StatelessWidget {
                   ),
                   if (platform == Platform.whatsapp && isSender) ...[
                     const SizedBox(width: 4),
-                    _StatusTick(status: message.status, platformTheme: platformTheme),
+                    _StatusTick(status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
                   ],
                 ],
               ),
@@ -909,12 +977,14 @@ class _AudioContent extends StatelessWidget {
   final bool isSender;
   final Platform platform;
   final PlatformTheme platformTheme;
+  final bool isBlockedMe;
 
   const _AudioContent({
     required this.message,
     required this.isSender,
     required this.platform,
     required this.platformTheme,
+    this.isBlockedMe = false,
   });
 
   String _formatDuration(Duration? d) {
@@ -976,7 +1046,7 @@ class _AudioContent extends StatelessWidget {
                           Text(message.formattedTime, style: platformTheme.timestampStyle),
                         if (platform == Platform.whatsapp && isSender) ...[
                           const SizedBox(width: 4),
-                          _StatusTick(status: message.status, platformTheme: platformTheme),
+                          _StatusTick(status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
                         ],
                       ],
                     ),
@@ -998,12 +1068,14 @@ class _CallContent extends StatelessWidget {
   final bool isSender;
   final Platform platform;
   final PlatformTheme platformTheme;
+  final bool isBlockedMe;
 
   const _CallContent({
     required this.message,
     required this.isSender,
     required this.platform,
     required this.platformTheme,
+    this.isBlockedMe = false,
   });
 
   String _formatCallDuration(Duration? d) {
@@ -1114,7 +1186,7 @@ class _CallContent extends StatelessWidget {
                 ),
                 if (isSender) ...[
                   const SizedBox(width: 3),
-                  _StatusTick(status: message.status, platformTheme: platformTheme),
+                  _StatusTick(status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
                 ],
               ],
             ),
@@ -1298,12 +1370,18 @@ class _MessengerStatusIndicator extends StatelessWidget {
 class _StatusTick extends StatelessWidget {
   final MessageStatus status;
   final PlatformTheme platformTheme;
+  final bool forceSentTick;
 
-  const _StatusTick({required this.status, required this.platformTheme});
+  const _StatusTick({
+    required this.status,
+    required this.platformTheme,
+    this.forceSentTick = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    switch (status) {
+    final effectiveStatus = forceSentTick ? MessageStatus.sent : status;
+    switch (effectiveStatus) {
       case MessageStatus.sending:
         return Icon(Icons.access_time_rounded, size: 12, color: platformTheme.tickColor);
       case MessageStatus.sent:
@@ -1349,6 +1427,7 @@ class _ReplyPreviewHeader extends StatelessWidget {
   final bool isSender;
   final Platform platform;
   final PlatformTheme platformTheme;
+  final bool bubbleIsRtl;
 
   const _ReplyPreviewHeader({
     required this.repliedToText,
@@ -1356,110 +1435,149 @@ class _ReplyPreviewHeader extends StatelessWidget {
     required this.isSender,
     required this.platform,
     required this.platformTheme,
+    required this.bubbleIsRtl,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = platformTheme.chatBg == Colors.black || 
-        platformTheme.chatBg.value == 0xFF0B141A || 
-        platformTheme.chatBg.value == 0xFF000000 || 
+    final isDark = platformTheme.chatBg == Colors.black ||
+        platformTheme.chatBg.value == 0xFF0B141A ||
+        platformTheme.chatBg.value == 0xFF000000 ||
         platformTheme.chatBg.value == 0xFF0B0C0E;
 
-    // Platform-specific styling
+    // Detect RTL from the quoted content itself
+    final bool isTextRtl =
+        _isArabic(repliedToText) || _isArabic(repliedToSenderName);
+
+    // ── Per-platform colours ──────────────────────────────────────────────────
     Color barColor;
     Color bgColor;
-    Color nameColor;
     Color textColor;
 
     switch (platform) {
       case Platform.whatsapp:
-        barColor = isSender ? const Color(0xFF00A884) : const Color(0xFF53BDEB);
-        bgColor = isDark 
-            ? Colors.white.withOpacity(0.06) 
-            : Colors.black.withOpacity(0.04);
-        nameColor = barColor;
-        textColor = isDark ? Colors.white70 : Colors.black87;
+        final bool isQuotedMe =
+            repliedToSenderName == 'You' || repliedToSenderName == 'أنت';
+        barColor =
+            isQuotedMe ? const Color(0xFF00A884) : const Color(0xFF53BDEB);
+        bgColor = isDark
+            ? Colors.black.withOpacity(0.25)
+            : Colors.black.withOpacity(0.08);
+        textColor = isDark ? const Color(0xFFB0BEC5) : const Color(0xFF546E7A);
         break;
       case Platform.messenger:
         barColor = isSender ? Colors.white70 : const Color(0xFF0084FF);
-        bgColor = isSender 
-            ? Colors.white.withOpacity(0.15) 
-            : (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05));
-        nameColor = isSender ? Colors.white : (isDark ? Colors.white : Colors.black87);
-        textColor = isSender ? Colors.white.withOpacity(0.8) : (isDark ? Colors.white70 : Colors.black54);
+        bgColor = isSender
+            ? Colors.white.withOpacity(0.18)
+            : (isDark
+                ? Colors.white.withOpacity(0.10)
+                : Colors.black.withOpacity(0.06));
+        textColor = isSender
+            ? Colors.white.withOpacity(0.8)
+            : (isDark ? Colors.white70 : Colors.black54);
         break;
       case Platform.instagram:
         barColor = isSender ? Colors.white60 : const Color(0xFFE1306C);
-        bgColor = isSender 
-            ? Colors.white.withOpacity(0.15) 
-            : (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05));
-        nameColor = isSender ? Colors.white : (isDark ? Colors.white : Colors.black87);
-        textColor = isSender ? Colors.white.withOpacity(0.8) : (isDark ? Colors.white70 : Colors.black54);
+        bgColor = isSender
+            ? Colors.white.withOpacity(0.18)
+            : (isDark
+                ? Colors.white.withOpacity(0.10)
+                : Colors.black.withOpacity(0.06));
+        textColor = isSender
+            ? Colors.white.withOpacity(0.8)
+            : (isDark ? Colors.white70 : Colors.black54);
         break;
       case Platform.snapchat:
         barColor = isSender ? const Color(0xFF00BFFF) : const Color(0xFFFF0000);
-        bgColor = isDark 
-            ? Colors.white.withOpacity(0.06) 
-            : Colors.black.withOpacity(0.04);
-        nameColor = barColor;
+        bgColor = isDark
+            ? Colors.white.withOpacity(0.07)
+            : Colors.black.withOpacity(0.05);
         textColor = isDark ? Colors.white70 : Colors.black87;
         break;
     }
 
-    final double horizontalMargin = platform == Platform.whatsapp ? 0.0 : 6.0;
+    // ── Margins & radius ──────────────────────────────────────────────────────
+    // Real WhatsApp: the quote block has ~6px margin on all sides INSIDE the
+    // bubble's own padding. All corners rounded (6px). It's NOT edge-to-edge.
+    const double qRadius = 6.0;
+    const double qMarginH = 0.0; // bubble already has its own side padding
+    const double qMarginTop = 0.0;
+    const double qMarginBottom = 4.0; // small gap before message text
 
-    return Container(
-      margin: EdgeInsets.only(
-        bottom: 6,
-        left: horizontalMargin,
-        right: horizontalMargin,
-        top: platform == Platform.whatsapp ? 2 : 4,
-      ),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: IntrinsicHeight(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 4,
-                color: barColor,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        repliedToSenderName,
-                        style: TextStyle(
-                          color: nameColor,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
+    // In Arabic/RTL, the accent bar moves to the RIGHT side
+    final bool barOnRight = isTextRtl;
+
+    return Directionality(
+      // Force layout direction based on bubble content, not app locale
+      textDirection: isTextRtl ? TextDirection.rtl : TextDirection.ltr,
+      child: Container(
+        margin: const EdgeInsets.only(
+          top: qMarginTop,
+          left: qMarginH,
+          right: qMarginH,
+          bottom: qMarginBottom,
+        ),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(qRadius),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(qRadius),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left accent bar (LTR)
+                if (!barOnRight) Container(width: 4, color: barColor),
+
+                // Quoted text
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+                    child: Column(
+                      crossAxisAlignment: isTextRtl
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Quoted sender name
+                        Text(
+                          repliedToSenderName,
+                          textAlign:
+                              isTextRtl ? TextAlign.right : TextAlign.left,
+                          style: TextStyle(
+                            color:
+                                barColor, // name always uses bar accent color
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        repliedToText,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 10.5,
+                        const SizedBox(height: 1),
+                        // Quoted message text (1 line like real WhatsApp)
+                        Text(
+                          repliedToText,
+                          textAlign:
+                              isTextRtl ? TextAlign.right : TextAlign.left,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 12,
+                            height: 1.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+
+                // Right accent bar (RTL)
+                if (barOnRight) Container(width: 4, color: barColor),
+              ],
+            ),
           ),
         ),
       ),

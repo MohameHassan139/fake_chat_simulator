@@ -170,6 +170,8 @@ class ChatSession {
   bool? lastMessageIsSender;
   bool isGroup;
   String groupMembers;
+  bool isBlocked;
+  bool isBlockedMe;
 
   ChatSession({
     required this.id,
@@ -190,6 +192,8 @@ class ChatSession {
     this.lastMessageIsSender,
     this.isGroup = false,
     this.groupMembers = '',
+    this.isBlocked = false,
+    this.isBlockedMe = false,
   }) : messages = messages ?? [];
 
   ChatSession copyWith({
@@ -210,6 +214,8 @@ class ChatSession {
     bool? lastMessageIsSender,
     bool? isGroup,
     String? groupMembers,
+    bool? isBlocked,
+    bool? isBlockedMe,
     bool clearCustomLastMessage = false,
     bool clearCustomLastMessageTime = false,
     bool clearLastMessageIsSender = false,
@@ -233,6 +239,8 @@ class ChatSession {
       lastMessageIsSender: clearLastMessageIsSender ? null : (lastMessageIsSender ?? this.lastMessageIsSender),
       isGroup: isGroup ?? this.isGroup,
       groupMembers: groupMembers ?? this.groupMembers,
+      isBlocked: isBlocked ?? this.isBlocked,
+      isBlockedMe: isBlockedMe ?? this.isBlockedMe,
     );
   }
 

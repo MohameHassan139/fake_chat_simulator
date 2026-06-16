@@ -218,7 +218,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
                 color: chatProvider.viewChatList
-                    ? const Color(0xFF6C63FF).withOpacity(0.2)
+                    ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
                     : const Color(0xFF242424),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -239,7 +239,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: _showEditor
-                    ? const Color(0xFF6C63FF).withOpacity(0.2)
+                    ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
                     : const Color(0xFF242424),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -289,7 +289,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           borderRadius: BorderRadius.circular(44),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               blurRadius: 30,
               spreadRadius: 5,
             ),
@@ -376,7 +376,7 @@ class _ToggleOption extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isActive ? activeColor.withOpacity(0.2) : Colors.transparent,
+            color: isActive ? activeColor.withValues(alpha: 0.2) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -482,3 +482,4 @@ class _PlatformSwitcher extends StatelessWidget {
     }
   }
 }
+

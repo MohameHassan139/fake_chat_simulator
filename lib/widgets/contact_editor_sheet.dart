@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
+import '../themes/platform_themes.dart';
 
 class ContactEditorSheet extends StatefulWidget {
   const ContactEditorSheet({super.key});
@@ -16,15 +17,20 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
   UserOnlineStatus _onlineStatus = UserOnlineStatus.online;
   bool _isTyping = false;
   DateTime? _lastSeen;
+  bool _isBlocked = false;
+  bool _isBlockedMe = false;
 
   @override
   void initState() {
     super.initState();
-    final contact = context.read<ChatProvider>().activeSession?.contactUser;
+    final session = context.read<ChatProvider>().activeSession;
+    final contact = session?.contactUser;
     _nameController = TextEditingController(text: contact?.name ?? '');
     _onlineStatus = contact?.onlineStatus ?? UserOnlineStatus.online;
     _isTyping = contact?.isTyping ?? false;
     _lastSeen = contact?.lastSeen;
+    _isBlocked = session?.isBlocked ?? false;
+    _isBlockedMe = session?.isBlockedMe ?? false;
   }
 
   @override
@@ -35,7 +41,8 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
 
   void _save() {
     final chatProvider = context.read<ChatProvider>();
-    final contact = chatProvider.activeSession?.contactUser;
+    final session = chatProvider.activeSession;
+    final contact = session?.contactUser;
     if (contact == null) return;
 
     chatProvider.updateContact(
@@ -45,6 +52,10 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
         isTyping: _isTyping,
         lastSeen: _lastSeen,
       ),
+    );
+    chatProvider.updateSessionSettings(
+      isBlocked: _isBlocked,
+      isBlockedMe: _isBlockedMe,
     );
     Navigator.pop(context);
   }
@@ -67,6 +78,10 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
   Widget build(BuildContext context) {
     final contact = context.watch<ChatProvider>().activeSession?.contactUser;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final chatProvider = context.watch<ChatProvider>();
+    final session = chatProvider.activeSession;
+    final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
+    final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
 
     return Container(
       decoration: const BoxDecoration(
@@ -105,7 +120,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                   children: [
                     CircleAvatar(
                       radius: 42,
-                      backgroundColor: const Color(0xFF6C63FF).withOpacity(0.2),
+                      backgroundColor: accentColor.withValues(alpha: 0.2),
                       backgroundImage: contact?.avatarBytes != null
                           ? MemoryImage(contact!.avatarBytes!)
                           : null,
@@ -114,8 +129,8 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                               contact?.name.isNotEmpty == true
                                   ? contact!.name[0].toUpperCase()
                                   : '?',
-                              style: const TextStyle(
-                                color: Color(0xFF6C63FF),
+                              style: TextStyle(
+                                color: accentColor,
                                 fontSize: 36,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -129,7 +144,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6C63FF),
+                          color: accentColor,
                           shape: BoxShape.circle,
                           border: Border.all(color: const Color(0xFF1A1A1A), width: 2),
                         ),
@@ -183,6 +198,20 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
               onChanged: (v) => setState(() => _isTyping = v),
             ),
 
+            // Block toggle
+            _ToggleRow(
+              label: 'Block Contact',
+              value: _isBlocked,
+              onChanged: (v) => setState(() => _isBlocked = v),
+            ),
+
+            // Blocked Me toggle
+            _ToggleRow(
+              label: 'Contact Blocked Me',
+              value: _isBlockedMe,
+              onChanged: (v) => setState(() => _isBlockedMe = v),
+            ),
+
             // Last seen (only when offline)
             if (_onlineStatus == UserOnlineStatus.offline || _onlineStatus == UserOnlineStatus.lastSeen) ...[
               const SizedBox(height: 16),
@@ -221,7 +250,8 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
@@ -290,22 +320,27 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = context.watch<ChatProvider>();
+    final session = chatProvider.activeSession;
+    final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
+    final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF6C63FF).withOpacity(0.2) : const Color(0xFF242424),
+          color: isActive ? accentColor.withValues(alpha: 0.2) : const Color(0xFF242424),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive ? const Color(0xFF6C63FF) : Colors.transparent,
+            color: isActive ? accentColor : Colors.transparent,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? const Color(0xFF6C63FF) : Colors.white54,
+            color: isActive ? accentColor : Colors.white54,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
             fontSize: 13,
           ),
@@ -324,6 +359,11 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = context.watch<ChatProvider>();
+    final session = chatProvider.activeSession;
+    final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
+    final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+
     return Row(
       children: [
         Expanded(
@@ -332,9 +372,10 @@ class _ToggleRow extends StatelessWidget {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: const Color(0xFF6C63FF),
+          activeColor: accentColor,
         ),
       ],
     );
   }
 }
+

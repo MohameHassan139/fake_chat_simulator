@@ -27,13 +27,13 @@ class PlatformInboxViewport extends StatelessWidget {
     switch (session.platform) {
       case Platform.whatsapp:
         statusBarBg = isDark ? const Color(0xFF1F2C34) : const Color(0xFF008069);
-        isLightStatus = false;
+        isLightStatus = true;
         break;
       case Platform.messenger:
       case Platform.instagram:
       case Platform.snapchat:
         statusBarBg = isDark ? Colors.black : Colors.white;
-        isLightStatus = !isDark;
+        isLightStatus = isDark;
         break;
     }
 
@@ -253,7 +253,6 @@ class _WhatsAppInbox extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                // Render real WhatsApp sessions
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
                   final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty ? s.groupMembers : 'No messages yet';
@@ -261,14 +260,18 @@ class _WhatsAppInbox extends StatelessWidget {
                   final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
                   final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
 
+                  final isBlocked = s.isBlocked || s.isBlockedMe;
+                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
+                  final isTyping = !isBlocked && s.contactUser.onlineStatus == UserOnlineStatus.typing;
+
                   return _WhatsAppRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: s.contactUser.onlineStatus == UserOnlineStatus.typing ? 'typing...' : lastMsgText,
+                    message: isTyping ? 'typing...' : lastMsgText,
                     time: lastMsgTime,
                     unreadCount: s.unreadCount,
-                    isOnline: !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing),
-                    isTyping: s.contactUser.onlineStatus == UserOnlineStatus.typing,
+                    isOnline: isOnline,
+                    isTyping: isTyping,
                     isLastSenderMe: isMe,
                     isGroup: s.isGroup,
                     textPrimary: textPrimary,
@@ -391,7 +394,7 @@ class _WhatsAppRow extends StatelessWidget {
         name: name,
         avatar: avatarBytes,
         size: 48,
-        fallbackBg: activeGreen.withOpacity(0.15),
+        fallbackBg: activeGreen.withValues(alpha: 0.15),
         fallbackText: activeGreen,
         isOnline: isOnline,
         showOnlineDot: !isGroup,
@@ -528,7 +531,7 @@ class _MessengerInbox extends StatelessWidget {
                   name: session.fakeName,
                   avatar: session.fakeAvatarBytes,
                   size: 32,
-                  fallbackBg: activeBlue.withOpacity(0.15),
+                  fallbackBg: activeBlue.withValues(alpha: 0.15),
                   fallbackText: activeBlue,
                 ),
                 const SizedBox(width: 12),
@@ -619,7 +622,6 @@ class _MessengerInbox extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                // Real Messenger Sessions
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
                   final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty ? s.groupMembers : 'No messages yet';
@@ -627,14 +629,18 @@ class _MessengerInbox extends StatelessWidget {
                   final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
                   final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
 
+                  final isBlocked = s.isBlocked || s.isBlockedMe;
+                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
+                  final isTyping = !isBlocked && s.contactUser.onlineStatus == UserOnlineStatus.typing;
+
                   return _MessengerRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: s.contactUser.onlineStatus == UserOnlineStatus.typing ? 'typing...' : lastMsgText,
+                    message: isTyping ? 'typing...' : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
-                    isOnline: !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing),
-                    isTyping: s.contactUser.onlineStatus == UserOnlineStatus.typing,
+                    isOnline: isOnline,
+                    isTyping: isTyping,
                     isLastSenderMe: isMe,
                     isGroup: s.isGroup,
                     textPrimary: textPrimary,
@@ -697,7 +703,7 @@ class _MessengerInbox extends StatelessWidget {
             name: name,
             avatar: avatarBytes,
             size: 52,
-            fallbackBg: activeColor.withOpacity(0.15),
+            fallbackBg: activeColor.withValues(alpha: 0.15),
             fallbackText: activeColor,
             isOnline: isOnline,
             showOnlineDot: true,
@@ -757,7 +763,7 @@ class _MessengerRow extends StatelessWidget {
         name: name,
         avatar: avatarBytes,
         size: 52,
-        fallbackBg: activeBlue.withOpacity(0.15),
+        fallbackBg: activeBlue.withValues(alpha: 0.15),
         fallbackText: activeBlue,
         isOnline: isOnline,
         showOnlineDot: !isGroup,
@@ -931,11 +937,12 @@ class _InstagramInbox extends StatelessWidget {
               children: [
                 // Real contacts notes
                 ...realSessions.map((s) {
+                  final isBlocked = s.isBlocked || s.isBlockedMe;
                   return _buildInstagramNoteBubble(
                     s.contactUser.name,
                     s.contactUser.avatarBytes,
-                    s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing,
-                    'Online',
+                    !isBlocked && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing),
+                    isBlocked ? '' : 'Online',
                     textPrimary,
                     activePink,
                     noteBubbleBg,
@@ -972,14 +979,18 @@ class _InstagramInbox extends StatelessWidget {
                   final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
                   final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
 
+                  final isBlocked = s.isBlocked || s.isBlockedMe;
+                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
+                  final isTyping = !isBlocked && s.contactUser.onlineStatus == UserOnlineStatus.typing;
+
                   return _InstagramRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: s.contactUser.onlineStatus == UserOnlineStatus.typing ? 'typing...' : lastMsgText,
+                    message: isTyping ? 'typing...' : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
-                    isOnline: !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing),
-                    isTyping: s.contactUser.onlineStatus == UserOnlineStatus.typing,
+                    isOnline: isOnline,
+                    isTyping: isTyping,
                     isLastSenderMe: isMe,
                     isGroup: s.isGroup,
                     textPrimary: textPrimary,
@@ -1047,7 +1058,7 @@ class _InstagramInbox extends StatelessWidget {
                 name: name,
                 avatar: avatarBytes,
                 size: 56,
-                fallbackBg: activeColor.withOpacity(0.15),
+                fallbackBg: activeColor.withValues(alpha: 0.15),
                 fallbackText: activeColor,
                 isOnline: isOnline,
                 showOnlineDot: !hasNote, // Only show green dot if note bubble is not taking up the space
@@ -1064,7 +1075,7 @@ class _InstagramInbox extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 3,
                           offset: const Offset(0, 1),
                         ),
@@ -1136,7 +1147,7 @@ class _InstagramRow extends StatelessWidget {
         name: name,
         avatar: avatarBytes,
         size: 56,
-        fallbackBg: activePink.withOpacity(0.15),
+        fallbackBg: activePink.withValues(alpha: 0.15),
         fallbackText: activePink,
         isOnline: isOnline,
         showOnlineDot: !isGroup,
@@ -1254,7 +1265,7 @@ class _SnapchatInbox extends StatelessWidget {
                   name: session.fakeName,
                   avatar: session.fakeAvatarBytes,
                   size: 38,
-                  fallbackBg: activeYellow.withOpacity(0.2),
+                  fallbackBg: activeYellow.withValues(alpha: 0.2),
                   fallbackText: Colors.black,
                 ),
                 const SizedBox(width: 8),
@@ -1324,6 +1335,9 @@ class _SnapchatInbox extends StatelessWidget {
                     }
                   }
 
+                  final isBlocked = s.isBlocked || s.isBlockedMe;
+                  final isOnline = !isBlocked && !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing);
+
                   return _SnapchatRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
@@ -1331,7 +1345,7 @@ class _SnapchatInbox extends StatelessWidget {
                     time: s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime),
                     streak: 0,
                     statusType: snapStatus,
-                    isOnline: !s.isGroup && (s.contactUser.onlineStatus == UserOnlineStatus.online || s.contactUser.onlineStatus == UserOnlineStatus.typing),
+                    isOnline: isOnline,
                     isGroup: s.isGroup,
                     textPrimary: textPrimary,
                     textSecondary: textSecondary,
@@ -1414,7 +1428,7 @@ class _SnapchatRow extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: textPrimary.withOpacity(0.04), width: 0.8)),
+        border: Border(bottom: BorderSide(color: textPrimary.withValues(alpha: 0.04), width: 0.8)),
       ),
       child: ListTile(
         onTap: onTap,
@@ -1423,7 +1437,7 @@ class _SnapchatRow extends StatelessWidget {
           name: name,
           avatar: avatarBytes,
           size: 42,
-          fallbackBg: const Color(0xFFFFFC00).withOpacity(0.18),
+          fallbackBg: const Color(0xFFFFFC00).withValues(alpha: 0.18),
           fallbackText: Colors.black87,
           isOnline: isOnline,
           showOnlineDot: false,
@@ -1482,7 +1496,7 @@ class _SnapchatRow extends StatelessWidget {
               Container(
                 width: 0.8,
                 height: 24,
-                color: textPrimary.withOpacity(0.1),
+                color: textPrimary.withValues(alpha: 0.1),
               ),
               const SizedBox(width: 14),
               Icon(

@@ -224,8 +224,8 @@ class _MessageContextMenu extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: message.isSender
-                        ? const Color(0xFF6C63FF).withOpacity(0.2)
-                        : const Color(0xFF42A5F5).withOpacity(0.2),
+                        ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
+                        : const Color(0xFF42A5F5).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -293,7 +293,7 @@ class _MenuItem extends StatelessWidget {
         width: 38,
         height: 38,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: color, size: 20),
@@ -304,3 +304,4 @@ class _MenuItem extends StatelessWidget {
     );
   }
 }
+

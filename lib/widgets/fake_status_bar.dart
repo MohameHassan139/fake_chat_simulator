@@ -48,7 +48,8 @@ class FakeStatusBar extends StatelessWidget {
               if (hasWifi)
                 Icon(Icons.wifi_rounded, color: textColor, size: 16),
               if (!hasWifi)
-                Icon(Icons.wifi_off_rounded, color: textColor.withOpacity(0.5), size: 16),
+                Icon(Icons.wifi_off_rounded,
+                    color: textColor.withValues(alpha: 0.5), size: 16),
               const SizedBox(width: 6),
               // Battery
               _BatteryIcon(level: battery, color: textColor),
@@ -75,7 +76,7 @@ class _SignalBars extends StatelessWidget {
           height: 4.0 + (i * 2.5),
           margin: const EdgeInsets.only(right: 1.5),
           decoration: BoxDecoration(
-            color: i < 3 ? color : color.withOpacity(0.4),
+            color: i < 3 ? color : color.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(1),
           ),
         );

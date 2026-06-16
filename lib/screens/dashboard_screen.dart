@@ -79,7 +79,7 @@ class DashboardScreen extends StatelessWidget {
             width: 100,
             height: 100,
             decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withOpacity(0.1),
+              color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -212,7 +212,7 @@ class _SessionCard extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: session.platformColor.withOpacity(0.15),
+                    color: session.platformColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
@@ -239,7 +239,7 @@ class _SessionCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: session.platformColor.withOpacity(0.2),
+                              color: session.platformColor.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -366,7 +366,7 @@ class _PlatformListTile extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: _color(platform).withOpacity(0.15),
+                    color: _color(platform).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(_icon(platform), color: _color(platform), size: 24),
@@ -459,12 +459,13 @@ class _PlatformChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: c.withOpacity(0.15),
+          color: c.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: c.withOpacity(0.4)),
+          border: Border.all(color: c.withValues(alpha: 0.4)),
         ),
         child: Text(label, style: TextStyle(color: c, fontWeight: FontWeight.w600, fontSize: 13)),
       ),
     );
   }
 }
+

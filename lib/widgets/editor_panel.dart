@@ -40,7 +40,7 @@ class EditorPanel extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6C63FF).withOpacity(0.1),
+                    color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -80,17 +80,19 @@ class EditorPanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                // Back to chat button
-                Expanded(
-                  child: OutlinedButton.icon(
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // Back to chat button
+                  OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF333333)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                     ),
                     icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 16),
                     label: Text(
@@ -101,17 +103,16 @@ class EditorPanel extends StatelessWidget {
                       chatProvider.setViewChatList(false);
                     },
                   ),
-                ),
-                const SizedBox(width: 12),
-                // Configure inbox header
-                Expanded(
-                  child: OutlinedButton.icon(
+                  const SizedBox(width: 12),
+                  // Configure inbox header
+                  OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF333333)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                     ),
                     icon: const Icon(Icons.settings_outlined, color: Colors.white70, size: 16),
                     label: Text(
@@ -130,45 +131,47 @@ class EditorPanel extends StatelessWidget {
                       );
                     },
                   ),
-                ),
-                const SizedBox(width: 12),
-                // Export screenshot
-                GestureDetector(
-                  onTap: isCapturing ? null : onCapture,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6C63FF), Color(0xFFFF6584)],
+                  const SizedBox(width: 12),
+                  // Export screenshot
+                  GestureDetector(
+                    onTap: isCapturing ? null : onCapture,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF6C63FF), Color(0xFFFF6584)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: isCapturing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Row(
-                            children: [
-                              const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
-                              const SizedBox(width: 6),
-                              Text(
-                                isAr ? 'تصدير' : 'Export',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      child: isCapturing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
                               ),
-                            ],
-                          ),
+                            )
+                          : Row(
+                              children: [
+                                const Icon(Icons.camera_alt_rounded,
+                                    size: 16, color: Colors.white),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isAr ? 'تصدير' : 'Export',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -208,48 +211,51 @@ class _ActionRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          // Contact settings
-          _ActionButton(
-            icon: Icons.person_outline_rounded,
-            label: LanguageHelper.translate('contact', isAr),
-            onTap: () => _showContactEditor(context),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _ActionButton(
+                    icon: Icons.person_outline_rounded,
+                    label: LanguageHelper.translate('contact', isAr),
+                    onTap: () => _showContactEditor(context),
+                  ),
+                  const SizedBox(width: 16),
+                  _ActionButton(
+                    icon: Icons.settings_outlined,
+                    label: LanguageHelper.translate('settings', isAr),
+                    onTap: () => _showSettingsEditor(context),
+                  ),
+                  const SizedBox(width: 16),
+                  _ActionButton(
+                    icon: Icons.image_outlined,
+                    label: LanguageHelper.translate('image', isAr),
+                    onTap: () => _pickImage(context),
+                  ),
+                  const SizedBox(width: 16),
+                  _ActionButton(
+                    icon: Icons.mic_outlined,
+                    label: LanguageHelper.translate('audio', isAr),
+                    onTap: () => _addAudioMessage(context),
+                  ),
+                  const SizedBox(width: 16),
+                  _ActionButton(
+                    icon: Icons.phone_outlined,
+                    label: LanguageHelper.translate('call', isAr),
+                    onTap: () => _addCallMessage(context),
+                  ),
+                  const SizedBox(width: 16),
+                  _ActionButton(
+                    icon: Icons.calendar_today_outlined,
+                    label: LanguageHelper.translate('date', isAr),
+                    onTap: () => _showDateDividerEditor(context),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
-          // Chat settings
-          _ActionButton(
-            icon: Icons.settings_outlined,
-            label: LanguageHelper.translate('settings', isAr),
-            onTap: () => _showSettingsEditor(context),
-          ),
-          const SizedBox(width: 8),
-          // Add image message
-          _ActionButton(
-            icon: Icons.image_outlined,
-            label: LanguageHelper.translate('image', isAr),
-            onTap: () => _pickImage(context),
-          ),
-          const SizedBox(width: 8),
-          // Add audio message
-          _ActionButton(
-            icon: Icons.mic_outlined,
-            label: LanguageHelper.translate('audio', isAr),
-            onTap: () => _addAudioMessage(context),
-          ),
-          const SizedBox(width: 8),
-          // Add call
-          _ActionButton(
-            icon: Icons.phone_outlined,
-            label: LanguageHelper.translate('call', isAr),
-            onTap: () => _addCallMessage(context),
-          ),
-          const SizedBox(width: 8),
-          // Add date divider
-          _ActionButton(
-            icon: Icons.calendar_today_outlined,
-            label: LanguageHelper.translate('date', isAr),
-            onTap: () => _showDateDividerEditor(context),
-          ),
-          const Spacer(),
+          const SizedBox(width: 12),
           // Capture button in panel too
           GestureDetector(
             onTap: isCapturing ? null : onCapture,
@@ -554,23 +560,27 @@ class _AudioDurationDialogState extends State<_AudioDurationDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _NumberPicker(
-                label: 'Min',
-                value: _minutes,
-                min: 0,
-                max: 9,
-                onChanged: (v) => setState(() => _minutes = v),
+              Flexible(
+                child: _NumberPicker(
+                  label: 'Min',
+                  value: _minutes,
+                  min: 0,
+                  max: 9,
+                  onChanged: (v) => setState(() => _minutes = v),
+                ),
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 child: Text(':', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
               ),
-              _NumberPicker(
-                label: 'Sec',
-                value: _seconds,
-                min: 0,
-                max: 59,
-                onChanged: (v) => setState(() => _seconds = v),
+              Flexible(
+                child: _NumberPicker(
+                  label: 'Sec',
+                  value: _seconds,
+                  min: 0,
+                  max: 59,
+                  onChanged: (v) => setState(() => _seconds = v),
+                ),
               ),
             ],
           ),
@@ -616,9 +626,16 @@ class _NumberPicker extends StatelessWidget {
         Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
         const SizedBox(height: 4),
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
               icon: const Icon(Icons.remove_circle_outline, color: Colors.white38),
+              iconSize: 22,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.zero,
+              style: const ButtonStyle(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: value > min ? () => onChanged(value - 1) : null,
             ),
             SizedBox(
@@ -631,6 +648,12 @@ class _NumberPicker extends StatelessWidget {
             ),
             IconButton(
               icon: const Icon(Icons.add_circle_outline, color: Color(0xFF6C63FF)),
+              iconSize: 22,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.zero,
+              style: const ButtonStyle(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: value < max ? () => onChanged(value + 1) : null,
             ),
           ],
@@ -639,3 +662,4 @@ class _NumberPicker extends StatelessWidget {
     );
   }
 }
+

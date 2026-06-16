@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/chat_models.dart';
 import '../themes/platform_themes.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/fake_status_bar.dart';
 import '../widgets/platform_app_bar.dart';
 import '../widgets/platform_input_bar.dart';
+import '../providers/theme_provider.dart';
+import '../providers/chat_provider.dart';
 
 class ChatViewport extends StatelessWidget {
   final ChatSession session;
@@ -50,7 +53,7 @@ class ChatViewport extends StatelessWidget {
   }
 
   bool _isLightBar(Platform p, bool isDark) {
-    if (isDark) return false;
+    if (isDark) return true;
     return p == Platform.whatsapp;
   }
 
@@ -71,7 +74,9 @@ class ChatViewport extends StatelessWidget {
   Widget _buildBackground({required Widget child}) {
     if (session.platform == Platform.whatsapp) {
       final Color bg = session.isDarkMode ? const Color(0xFF0B141A) : const Color(0xFFECE5DD);
-      final Color doodleColor = session.isDarkMode ? Colors.white.withOpacity(0.018) : Colors.black.withOpacity(0.038);
+      final Color doodleColor = session.isDarkMode
+          ? Colors.white.withValues(alpha: 0.018)
+          : Colors.black.withValues(alpha: 0.038);
 
       return Container(
         color: bg,
@@ -90,11 +95,13 @@ class ChatViewport extends StatelessWidget {
   int _countWithDateDividers(List<ChatMessage> messages) {
     // Add 1 for the scrollable _ProfileHeaderCard at visualIndex 0!
     int count = 1;
-    if (messages.isEmpty) return count;
+    final bool hasWhatsAppBlockCard = session.platform == Platform.whatsapp && session.isBlocked;
+    
+    if (messages.isEmpty) return count + (hasWhatsAppBlockCard ? 1 : 0);
 
     final bool hasManualDateDividers = messages.any((m) => m.type == MessageType.dateDivider);
     if (hasManualDateDividers) {
-      return count + messages.length;
+      return count + messages.length + (hasWhatsAppBlockCard ? 1 : 0);
     }
 
     final bool isMessengerOrInstagram = session.platform == Platform.messenger || session.platform == Platform.instagram;
@@ -121,13 +128,18 @@ class ChatViewport extends StatelessWidget {
         }
       }
     }
-    return count;
+    return count + (hasWhatsAppBlockCard ? 1 : 0);
   }
 
   Widget _buildListItem(BuildContext context, int visualIndex, List<ChatMessage> messages) {
     // Index 0 is always the large profile chat banner header
     if (visualIndex == 0) {
       return _ProfileHeaderCard(session: session, platformTheme: platformTheme);
+    }
+
+    final bool hasWhatsAppBlockCard = session.platform == Platform.whatsapp && session.isBlocked;
+    if (hasWhatsAppBlockCard && visualIndex == _countWithDateDividers(messages) - 1) {
+      return _buildWhatsAppBlockedSystemCard(context);
     }
 
     // Offset standard message processing by -1
@@ -167,6 +179,7 @@ class ChatViewport extends StatelessWidget {
         platformTheme: platformTheme,
         isFirstInGroup: isFirstInGroup,
         isLastInGroup: isLastInGroup,
+        isBlockedMe: session.isBlockedMe,
       );
     }
 
@@ -210,6 +223,7 @@ class ChatViewport extends StatelessWidget {
             platformTheme: platformTheme,
             isFirstInGroup: isFirstInGroup,
             isLastInGroup: isLastInGroup,
+            isBlockedMe: session.isBlockedMe,
           );
         }
         counter++;
@@ -249,6 +263,7 @@ class ChatViewport extends StatelessWidget {
             platformTheme: platformTheme,
             isFirstInGroup: isFirstInGroup,
             isLastInGroup: isLastInGroup,
+            isBlockedMe: session.isBlockedMe,
           );
         }
         counter++;
@@ -303,6 +318,40 @@ class ChatViewport extends StatelessWidget {
     final formattedHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
     return '$formattedHour:$minute $period';
   }
+
+  Widget _buildWhatsAppBlockedSystemCard(BuildContext context) {
+    final isDark = session.isDarkMode;
+    final isAr = context.read<ThemeProvider>().isArabic;
+    final Color cardBg = isDark ? const Color(0xFF182229) : const Color(0xFFFFEECD);
+    final Color textCol = isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: Center(
+        child: InkWell(
+          onTap: () => _showUnblockDialog(context, session),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: isDark ? Colors.transparent : const Color(0xFFF0E0C0), width: 0.8),
+            ),
+            child: Text(
+              isAr ? 'لقد حظرت جهة الاتصال هذه. انقر لإلغاء الحظر.' : 'You blocked this contact. Tap to unblock.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: textCol,
+                fontSize: 11.5,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _DateDivider extends StatelessWidget {
@@ -319,10 +368,14 @@ class _DateDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (platform == Platform.whatsapp) {
-      final Color bg = platformTheme.chatBg == Colors.black || platformTheme.chatBg.value == 0xFF0B141A
+      final Color bg = platformTheme.chatBg == Colors.black ||
+              platformTheme.chatBg.toARGB32() ==
+                  const Color(0xFF0B141A).toARGB32()
           ? const Color(0xFF182229)
           : const Color(0xFFE1F3FC);
-      final Color textCol = platformTheme.chatBg == Colors.black || platformTheme.chatBg.value == 0xFF0B141A
+      final Color textCol = platformTheme.chatBg == Colors.black ||
+              platformTheme.chatBg.toARGB32() ==
+                  const Color(0xFF0B141A).toARGB32()
           ? const Color(0xFF8696A0)
           : const Color(0xFF536A75);
 
@@ -336,7 +389,7 @@ class _DateDivider extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 1,
                   offset: const Offset(0, 1),
                 ),
@@ -359,9 +412,10 @@ class _DateDivider extends StatelessWidget {
     // Messenger, Instagram, Snapchat minimal date text
     final double letterSpacing = platform == Platform.instagram ? 0.8 : 0.4;
     final fontWeight = platform == Platform.messenger ? FontWeight.w600 : FontWeight.w500;
-    final textCol = platformTheme.chatBg == Colors.black || platformTheme.chatBg.value == 0xFF000000 || platformTheme.chatBg.value == 0xFF0B0C0E
-        ? Colors.white38 
-        : Colors.grey[500];
+    final isDarkBg = platformTheme.chatBg == Colors.black ||
+        platformTheme.chatBg.toARGB32() == const Color(0xFF000000).toARGB32() ||
+        platformTheme.chatBg.toARGB32() == const Color(0xFF0B0C0E).toARGB32();
+    final textCol = isDarkBg ? Colors.white38 : Colors.grey[500];
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -449,7 +503,8 @@ class _ProfileHeaderCard extends StatelessWidget {
             else
               CircleAvatar(
                 radius: 40,
-                backgroundColor: platformTheme.appBarIcon.withOpacity(0.18),
+                backgroundColor:
+                    platformTheme.appBarIcon.withValues(alpha: 0.18),
                 child: Text(
                   user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
                   style: TextStyle(color: platformTheme.appBarIcon, fontWeight: FontWeight.bold, fontSize: 32),
@@ -523,7 +578,8 @@ class _ProfileHeaderCard extends StatelessWidget {
                     ? CircleAvatar(radius: 36, backgroundImage: MemoryImage(user.avatarBytes!))
                     : CircleAvatar(
                         radius: 36,
-                        backgroundColor: const Color(0xFFE1306C).withOpacity(0.18),
+                        backgroundColor:
+                            const Color(0xFFE1306C).withValues(alpha: 0.18),
                         child: const Text('?', style: TextStyle(color: Color(0xFFE1306C), fontSize: 24)),
                       ),
               ),
@@ -578,7 +634,7 @@ class _ProfileHeaderCard extends StatelessWidget {
             else
               CircleAvatar(
                 radius: 36,
-                backgroundColor: const Color(0xFFFFFC00).withOpacity(0.2),
+                backgroundColor: const Color(0xFFFFFC00).withValues(alpha: 0.2),
                 child: const Icon(Icons.face_rounded, color: Colors.black54, size: 40),
               ),
             const SizedBox(height: 12),
@@ -598,6 +654,50 @@ class _ProfileHeaderCard extends StatelessWidget {
 
     return const SizedBox.shrink();
   }
+
+}
+
+void _showUnblockDialog(BuildContext context, ChatSession session) {
+  final isAr = context.read<ThemeProvider>().isArabic;
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      final isDark = session.isDarkMode;
+      final Color bg = isDark ? const Color(0xFF2B373E) : Colors.white;
+      final Color textCol = isDark ? Colors.white : const Color(0xFF1F2C34);
+      final Color actionCol = isDark ? const Color(0xFF00A884) : const Color(0xFF008069);
+
+      return AlertDialog(
+        backgroundColor: bg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        content: Text(
+          isAr ? 'هل تريد إلغاء حظر ${session.contactUser.name}؟' : 'Unblock ${session.contactUser.name}?',
+          style: TextStyle(color: textCol, fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              isAr ? 'إلغاء' : 'CANCEL',
+              style: TextStyle(color: actionCol, fontWeight: FontWeight.bold),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              chatProvider.updateSessionSettings(isBlocked: false);
+              Navigator.pop(ctx);
+            },
+            child: Text(
+              isAr ? 'إلغاء الحظر' : 'UNBLOCK',
+              style: TextStyle(color: actionCol, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 // ─── WhatsApp Wallpaper Painter ──────────────────────────────────────────────────

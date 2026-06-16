@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../models/chat_models.dart';
+import '../themes/platform_themes.dart';
 
 class SettingsEditorSheet extends StatefulWidget {
   const SettingsEditorSheet({super.key});
@@ -133,6 +134,10 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final chatProvider = context.watch<ChatProvider>();
+    final session = chatProvider.activeSession;
+    final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
+    final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
 
     return Container(
       decoration: const BoxDecoration(
@@ -187,7 +192,7 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                   Switch(
                     value: _isDark,
                     onChanged: (v) => setState(() => _isDark = v),
-                    activeColor: const Color(0xFF6C63FF),
+                    activeColor: accentColor,
                   ),
                 ],
               ),
@@ -295,7 +300,7 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                   Switch(
                     value: _wifi,
                     onChanged: (v) => setState(() => _wifi = v),
-                    activeColor: const Color(0xFF6C63FF),
+                    activeColor: accentColor,
                   ),
                 ],
               ),
@@ -326,7 +331,7 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                       Switch(
                         value: _isContactOnline,
                         onChanged: (v) => setState(() => _isContactOnline = v),
-                        activeColor: const Color(0xFF6C63FF),
+                        activeColor: accentColor,
                       ),
                     ],
                   ),
@@ -346,7 +351,7 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                       Switch(
                         value: _isGroup,
                         onChanged: (v) => setState(() => _isGroup = v),
-                        activeColor: const Color(0xFF6C63FF),
+                        activeColor: accentColor,
                       ),
                     ],
                   ),
@@ -472,7 +477,8 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
@@ -513,3 +519,4 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
+

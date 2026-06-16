@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
 import '../providers/theme_provider.dart';
+import '../themes/platform_themes.dart';
 import '../utils/language_helper.dart';
 
 const _uuid = Uuid();
@@ -108,6 +109,19 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     final chatProvider = context.read<ChatProvider>();
     final text = _textController.text.trim();
 
+    if (_type == MessageType.text && text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message text cannot be empty')),
+      );
+      return;
+    }
+    if (_type == MessageType.dateDivider && text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Date separator text cannot be empty')),
+      );
+      return;
+    }
+
     final Duration? finalDuration = (_type == MessageType.audio || _type == MessageType.voiceCall || _type == MessageType.videoCall)
         ? Duration(minutes: _minutes, seconds: _seconds)
         : null;
@@ -169,6 +183,10 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final chatProvider = context.watch<ChatProvider>();
+    final session = chatProvider.activeSession;
+    final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
+    final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
 
     return Container(
       decoration: const BoxDecoration(
@@ -247,7 +265,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF242424),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -447,11 +465,11 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFF6C63FF).withOpacity(0.18)
+                              ? accentColor.withValues(alpha: 0.18)
                               : const Color(0xFF242424),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isSelected ? const Color(0xFF6C63FF) : Colors.transparent,
+                            color: isSelected ? accentColor : Colors.transparent,
                           ),
                         ),
                         child: Center(
@@ -459,7 +477,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                             status,
                             style: TextStyle(
                               fontSize: 11,
-                              color: isSelected ? const Color(0xFF6C63FF) : Colors.white70,
+                              color: isSelected ? accentColor : Colors.white70,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -527,11 +545,11 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFF6C63FF).withOpacity(0.18)
+                            ? accentColor.withValues(alpha: 0.18)
                             : const Color(0xFF242424),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? const Color(0xFF6C63FF) : Colors.transparent,
+                          color: isSelected ? accentColor : Colors.transparent,
                         ),
                       ),
                       child: Text(emoji, style: const TextStyle(fontSize: 16)),
@@ -568,7 +586,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                       label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? 'Outgoing (Right)' : 'Me (Right)',
                       icon: Icons.send_rounded,
                       isActive: _isSender,
-                      color: const Color(0xFF6C63FF),
+                      color: accentColor,
                       onTap: () => setState(() => _isSender = true),
                     ),
                   ),
@@ -601,22 +619,22 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: _status == s
-                              ? const Color(0xFF6C63FF).withOpacity(0.18)
+                              ? accentColor.withValues(alpha: 0.18)
                               : const Color(0xFF242424),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: _status == s ? const Color(0xFF6C63FF) : Colors.transparent,
+                            color: _status == s ? accentColor : Colors.transparent,
                           ),
                         ),
                         child: Column(
                           children: [
-                            Icon(_statusIcon(s), size: 18, color: _status == s ? const Color(0xFF6C63FF) : Colors.white38),
+                            Icon(_statusIcon(s), size: 18, color: _status == s ? accentColor : Colors.white38),
                             const SizedBox(height: 3),
                             Text(
                               _statusLabel(s),
                               style: TextStyle(
                                 fontSize: 10,
-                                color: _status == s ? const Color(0xFF6C63FF) : Colors.white38,
+                                color: _status == s ? accentColor : Colors.white38,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -674,7 +692,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
@@ -762,16 +781,22 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   itemCount: otherMessages.length,
                   itemBuilder: (listCtx, index) {
                     final m = otherMessages[index];
+                    final chatProvider = context.read<ChatProvider>();
+                    final session = chatProvider.activeSession;
+                    final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
+                    final dialogAccentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+
                     final senderName = m.isSender
                         ? 'You'
-                        : (session.contactUser.name.isNotEmpty ? session.contactUser.name : 'Contact');
+                        : (session != null && session.contactUser.name.isNotEmpty ? session.contactUser.name : 'Contact');
+
                     return ListTile(
                       dense: true,
                       contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                       title: Text(
                         senderName,
                         style: TextStyle(
-                          color: m.isSender ? const Color(0xFF6C63FF) : const Color(0xFF42A5F5),
+                          color: m.isSender ? dialogAccentColor : const Color(0xFF42A5F5),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -840,7 +865,7 @@ class _SideButton extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.15) : const Color(0xFF242424),
+          color: isActive ? color.withValues(alpha: 0.15) : const Color(0xFF242424),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isActive ? color : Colors.transparent),
         ),
@@ -904,6 +929,11 @@ class _NumberPickerSimple extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = context.watch<ChatProvider>();
+    final session = chatProvider.activeSession;
+    final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
+    final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+
     return Column(
       children: [
         Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
@@ -923,7 +953,7 @@ class _NumberPickerSimple extends StatelessWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: Color(0xFF6C63FF), size: 20),
+              icon: Icon(Icons.add_circle_outline, color: accentColor, size: 20),
               onPressed: value < max ? () => onChanged(value + 1) : null,
             ),
           ],
@@ -932,3 +962,4 @@ class _NumberPickerSimple extends StatelessWidget {
     );
   }
 }
+
