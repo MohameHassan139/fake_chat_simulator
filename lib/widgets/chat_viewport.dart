@@ -8,6 +8,7 @@ import '../widgets/platform_app_bar.dart';
 import '../widgets/platform_input_bar.dart';
 import '../providers/theme_provider.dart';
 import '../providers/chat_provider.dart';
+import '../utils/language_helper.dart';
 
 class ChatViewport extends StatelessWidget {
   final ChatSession session;
@@ -59,13 +60,14 @@ class ChatViewport extends StatelessWidget {
 
   Widget _buildChatArea(BuildContext context) {
     final messages = session.messages;
+    final bool isAr = context.read<ThemeProvider>().isArabic;
 
     return _buildBackground(
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-        itemCount: _countWithDateDividers(messages),
+        itemCount: _countWithDateDividers(messages, isAr),
         itemBuilder: (context, index) {
-          return _buildListItem(context, index, messages);
+          return _buildListItem(context, index, messages, isAr);
         },
       ),
     );
@@ -92,7 +94,7 @@ class ChatViewport extends StatelessWidget {
     );
   }
 
-  int _countWithDateDividers(List<ChatMessage> messages) {
+  int _countWithDateDividers(List<ChatMessage> messages, bool isAr) {
     // Add 1 for the scrollable _ProfileHeaderCard at visualIndex 0!
     int count = 1;
     final bool hasWhatsAppBlockCard = session.platform == Platform.whatsapp && session.isBlocked;
@@ -121,7 +123,7 @@ class ChatViewport extends StatelessWidget {
     } else {
       String? lastDate;
       for (final m in messages) {
-        final dateStr = _dateLabel(m.timestamp);
+        final dateStr = _dateLabel(m.timestamp, isAr);
         if (dateStr != lastDate) {
           count++;
           lastDate = dateStr;
@@ -131,14 +133,14 @@ class ChatViewport extends StatelessWidget {
     return count + (hasWhatsAppBlockCard ? 1 : 0);
   }
 
-  Widget _buildListItem(BuildContext context, int visualIndex, List<ChatMessage> messages) {
+  Widget _buildListItem(BuildContext context, int visualIndex, List<ChatMessage> messages, bool isAr) {
     // Index 0 is always the large profile chat banner header
     if (visualIndex == 0) {
       return _ProfileHeaderCard(session: session, platformTheme: platformTheme);
     }
 
     final bool hasWhatsAppBlockCard = session.platform == Platform.whatsapp && session.isBlocked;
-    if (hasWhatsAppBlockCard && visualIndex == _countWithDateDividers(messages) - 1) {
+    if (hasWhatsAppBlockCard && visualIndex == _countWithDateDividers(messages, isAr) - 1) {
       return _buildWhatsAppBlockedSystemCard(context);
     }
 
@@ -195,7 +197,7 @@ class ChatViewport extends StatelessWidget {
         if (showSeparatorBefore) {
           if (counter == adjustedIndex) {
             return _DateDivider(
-              label: _formatDateTimeSeparator(msg.timestamp),
+              label: _formatDateTimeSeparator(msg.timestamp, isAr),
               platform: session.platform,
               platformTheme: platformTheme,
             );
@@ -232,7 +234,7 @@ class ChatViewport extends StatelessWidget {
       String? lastDate;
       for (int i = 0; i < messages.length; i++) {
         final msg = messages[i];
-        final dateStr = _dateLabel(msg.timestamp);
+        final dateStr = _dateLabel(msg.timestamp, isAr);
 
         if (dateStr != lastDate) {
           if (counter == adjustedIndex) {
@@ -250,8 +252,8 @@ class ChatViewport extends StatelessWidget {
           final prevMsg = i > 0 ? messages[i - 1] : null;
           final nextMsg = i < messages.length - 1 ? messages[i + 1] : null;
 
-          final bool isNewDateGroup = prevMsg == null || _dateLabel(prevMsg.timestamp) != _dateLabel(msg.timestamp);
-          final bool isNextDateGroup = nextMsg == null || _dateLabel(nextMsg.timestamp) != _dateLabel(msg.timestamp);
+          final bool isNewDateGroup = prevMsg == null || _dateLabel(prevMsg.timestamp, isAr) != _dateLabel(msg.timestamp, isAr);
+          final bool isNextDateGroup = nextMsg == null || _dateLabel(nextMsg.timestamp, isAr) != _dateLabel(msg.timestamp, isAr);
 
           final bool isFirstInGroup = isNewDateGroup || prevMsg.isSender != msg.isSender;
           final bool isLastInGroup = isNextDateGroup || nextMsg.isSender != msg.isSender;
@@ -273,15 +275,17 @@ class ChatViewport extends StatelessWidget {
     return const SizedBox.shrink();
   }
 
-  String _dateLabel(DateTime dt) {
+  String _dateLabel(DateTime dt, bool isArabic) {
     final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inDays == 0) return 'Today';
-    if (diff.inDays == 1) return 'Yesterday';
+    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    if (isToday) return LanguageHelper.translate('today', isArabic);
+    final yesterday = now.subtract(const Duration(days: 1));
+    final isYesterday = dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day;
+    if (isYesterday) return LanguageHelper.translate('yesterday', isArabic);
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 
-  String _formatDateTimeSeparator(DateTime dt) {
+  String _formatDateTimeSeparator(DateTime dt, bool isArabic) {
     final now = DateTime.now();
     
     // Check if same day
@@ -290,31 +294,39 @@ class ChatViewport extends StatelessWidget {
     final yesterday = now.subtract(const Duration(days: 1));
     final isYesterday = dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day;
     
-    final timeStr = _formatTimeOnly(dt);
+    final timeStr = _formatTimeOnly(dt, isArabic);
     
     if (isToday) {
       return timeStr;
     }
+    
+    final comma = isArabic ? '، ' : ', ';
+    
     if (isYesterday) {
-      return 'Yesterday, $timeStr';
+      return '${LanguageHelper.translate('yesterday', isArabic)}$comma$timeStr';
     }
     
     final diffDays = now.difference(dt).inDays;
     if (diffDays < 7) {
       final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       final weekday = weekdays[dt.weekday - 1];
-      return '$weekday, $timeStr';
+      return '${LanguageHelper.translate(weekday.toLowerCase(), isArabic)}$comma$timeStr';
     }
     
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final month = months[dt.month - 1];
+    if (isArabic) {
+      return '${dt.day} ${LanguageHelper.translate(month.toLowerCase(), isArabic)}$comma${dt.year}$comma$timeStr';
+    }
     return '$month ${dt.day}, ${dt.year}, $timeStr';
   }
 
-  String _formatTimeOnly(DateTime dt) {
+  String _formatTimeOnly(DateTime dt, bool isArabic) {
     final hour = dt.hour;
     final minute = dt.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
+    final period = hour >= 12 
+        ? (isArabic ? 'م' : 'PM') 
+        : (isArabic ? 'ص' : 'AM');
     final formattedHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
     return '$formattedHour:$minute $period';
   }
@@ -367,6 +379,9 @@ class _DateDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Provider.of<ThemeProvider>(context).isArabic;
+    final displayLabel = LanguageHelper.translateDate(label, isAr);
+
     if (platform == Platform.whatsapp) {
       final Color bg = platformTheme.chatBg == Colors.black ||
               platformTheme.chatBg.toARGB32() ==
@@ -396,7 +411,7 @@ class _DateDivider extends StatelessWidget {
               ],
             ),
             child: Text(
-              label.toUpperCase(),
+              displayLabel.toUpperCase(),
               style: TextStyle(
                 color: textCol,
                 fontSize: 11,
@@ -421,7 +436,7 @@ class _DateDivider extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Center(
         child: Text(
-          label.toUpperCase(),
+          displayLabel.toUpperCase(),
           style: TextStyle(
             color: textCol,
             fontSize: 11.5,

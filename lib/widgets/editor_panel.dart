@@ -592,7 +592,10 @@ class _AudioDurationDialogState extends State<_AudioDurationDialog> {
           child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
         ),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C63FF),
+            foregroundColor: Colors.white,
+          ),
           onPressed: () {
             widget.onConfirm(Duration(minutes: _minutes, seconds: _seconds));
             Navigator.pop(context);

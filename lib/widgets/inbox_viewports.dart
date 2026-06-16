@@ -6,6 +6,7 @@ import '../providers/chat_provider.dart';
 import '../providers/theme_provider.dart';
 import '../themes/platform_themes.dart';
 import '../widgets/fake_status_bar.dart';
+import '../utils/language_helper.dart';
 
 class PlatformInboxViewport extends StatelessWidget {
   final ChatSession session;
@@ -255,7 +256,9 @@ class _WhatsAppInbox extends StatelessWidget {
               children: [
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty ? s.groupMembers : 'No messages yet';
+                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
+                      ? s.groupMembers 
+                      : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
                   final lastMsgText = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
                   final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
                   final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
@@ -267,7 +270,7 @@ class _WhatsAppInbox extends StatelessWidget {
                   return _WhatsAppRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: isTyping ? 'typing...' : lastMsgText,
+                    message: isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
                     time: lastMsgTime,
                     unreadCount: s.unreadCount,
                     isOnline: isOnline,
@@ -293,7 +296,7 @@ class _WhatsAppInbox extends StatelessWidget {
                     name: m['name'],
                     avatarBytes: null,
                     message: m['message'],
-                    time: m['time'],
+                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
                     unreadCount: m['unread'],
                     isOnline: m['online'],
                     isTyping: m['typing'],
@@ -624,7 +627,9 @@ class _MessengerInbox extends StatelessWidget {
               children: [
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty ? s.groupMembers : 'No messages yet';
+                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
+                      ? s.groupMembers 
+                      : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
                   final lastMsgText = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
                   final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
                   final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
@@ -636,7 +641,7 @@ class _MessengerInbox extends StatelessWidget {
                   return _MessengerRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: isTyping ? 'typing...' : lastMsgText,
+                    message: isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
                     isOnline: isOnline,
@@ -661,7 +666,7 @@ class _MessengerInbox extends StatelessWidget {
                     name: m['name'],
                     avatarBytes: null,
                     message: m['message'],
-                    time: m['time'],
+                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
                     isUnread: m['unread'],
                     isOnline: m['online'],
                     isTyping: m['typing'],
@@ -755,6 +760,7 @@ class _MessengerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final boldText = isUnread || isTyping;
+    final isAr = Provider.of<ThemeProvider>(context).isArabic;
 
     return ListTile(
       onTap: onTap,
@@ -783,7 +789,7 @@ class _MessengerRow extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                isLastSenderMe && !isTyping ? 'You: $message' : message,
+                isLastSenderMe && !isTyping ? '${LanguageHelper.translate('you', isAr)}: $message' : message,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -974,7 +980,9 @@ class _InstagramInbox extends StatelessWidget {
                 // Real Instagram Sessions
                 ...realSessions.map((s) {
                   final hasMessages = s.messages.isNotEmpty;
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty ? s.groupMembers : 'No messages yet';
+                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
+                      ? s.groupMembers 
+                      : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
                   final lastMsgText = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
                   final lastMsgTime = s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
                   final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
@@ -986,7 +994,7 @@ class _InstagramInbox extends StatelessWidget {
                   return _InstagramRow(
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
-                    message: isTyping ? 'typing...' : lastMsgText,
+                    message: isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
                     isOnline: isOnline,
@@ -1011,7 +1019,7 @@ class _InstagramInbox extends StatelessWidget {
                     name: m['name'],
                     avatarBytes: null,
                     message: m['message'],
-                    time: m['time'],
+                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
                     isUnread: m['unread'],
                     isOnline: m['online'],
                     isTyping: false,
@@ -1139,6 +1147,7 @@ class _InstagramRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final boldText = isUnread || isTyping;
+    final isAr = Provider.of<ThemeProvider>(context).isArabic;
 
     return ListTile(
       onTap: onTap,
@@ -1167,7 +1176,7 @@ class _InstagramRow extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                isLastSenderMe && !isTyping ? 'Sent $message' : message,
+                isLastSenderMe && !isTyping ? '${LanguageHelper.translate('sent', isAr)} $message' : message,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1319,7 +1328,9 @@ class _SnapchatInbox extends StatelessWidget {
                   final hasMessages = s.messages.isNotEmpty;
                   final isMe = s.lastMessageIsSender ?? (hasMessages && s.messages.last.isSender);
                   
-                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty ? s.groupMembers : 'New Chat';
+                  final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty 
+                      ? s.groupMembers 
+                      : (isAr ? 'دردشة جديدة' : 'New Chat');
                   final msg = s.customLastMessage ?? (hasMessages ? s.messages.last.text : defaultLastMsgText);
                   
                   String snapStatus;
@@ -1342,7 +1353,7 @@ class _SnapchatInbox extends StatelessWidget {
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
                     message: msg,
-                    time: s.customLastMessageTime ?? (hasMessages ? s.messages.last.formattedTime : s.fakeTime),
+                    time: s.customLastMessageTime != null ? LanguageHelper.translate(s.customLastMessageTime!.toLowerCase(), isAr) : (hasMessages ? s.messages.last.formattedTime : s.fakeTime),
                     streak: 0,
                     statusType: snapStatus,
                     isOnline: isOnline,
@@ -1364,7 +1375,7 @@ class _SnapchatInbox extends StatelessWidget {
                     name: m['name'],
                     avatarBytes: null,
                     message: m['message'],
-                    time: m['time'],
+                    time: LanguageHelper.translate(m['time'].toLowerCase(), isAr),
                     streak: m['streak'],
                     statusType: m['status'],
                     isOnline: m['online'],
@@ -1425,6 +1436,20 @@ class _SnapchatRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showBold = statusType.contains('unread');
+    final isAr = Provider.of<ThemeProvider>(context).isArabic;
+
+    // Translate standard Snapchat statuses if present
+    String displayedMsg = message;
+    final lowerMsg = message.toLowerCase().trim();
+    if (lowerMsg == 'new snap') {
+      displayedMsg = LanguageHelper.translate('new_snap', isAr);
+    } else if (lowerMsg == 'opened') {
+      displayedMsg = LanguageHelper.translate('opened', isAr);
+    } else if (lowerMsg == 'new chat') {
+      displayedMsg = LanguageHelper.translate('new_chat', isAr);
+    } else if (lowerMsg == 'typing...') {
+      displayedMsg = LanguageHelper.translate('typing', isAr);
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -1469,7 +1494,7 @@ class _SnapchatRow extends StatelessWidget {
               _buildSnapchatStatusIcon(),
               const SizedBox(width: 6),
               Text(
-                message,
+                displayedMsg,
                 style: TextStyle(
                   color: _statusColor(statusType),
                   fontWeight: showBold ? FontWeight.w900 : FontWeight.bold,

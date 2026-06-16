@@ -39,6 +39,8 @@ class MessageBubble extends StatelessWidget {
     }
 
     final isSender = message.isSender;
+    final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+    final bool effectiveSender = isArabicLocale ? !isSender : isSender;
     final hasReaction = message.reaction != null && message.reaction!.isNotEmpty;
 
     // Determine high-fidelity external status indicator based on platform
@@ -100,8 +102,8 @@ class MessageBubble extends StatelessWidget {
           bubble,
           Positioned(
             bottom: -6,
-            left: isSender ? 12 : null,
-            right: isSender ? null : 12,
+            left: effectiveSender ? 12 : null,
+            right: effectiveSender ? null : 12,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
@@ -164,18 +166,20 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildBubble(BuildContext context, bool isSender) {
+    final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+    final bool effectiveSender = isArabicLocale ? !isSender : isSender;
     final radius = platformTheme.bubbleRadius;
     final BorderRadius borderRadius;
 
     if (platform == Platform.messenger || platform == Platform.instagram) {
       borderRadius = _getMessengerInstagramBorderRadius(
-        isSender,
+        effectiveSender,
         isFirstInGroup,
         isLastInGroup,
         radius,
       );
     } else {
-      if (isSender) {
+      if (effectiveSender) {
         borderRadius = BorderRadius.only(
           topLeft: Radius.circular(radius),
           topRight: Radius.circular(isFirstInGroup ? radius : platformTheme.senderBubbleRadiusTR),
@@ -194,7 +198,6 @@ class MessageBubble extends StatelessWidget {
 
     Widget bubbleContent;
 
-    final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
     final bool isRtl = isArabicLocale || _isArabic(message.text);
     final hasReply =
         message.repliedToId != null && message.repliedToText != null;
@@ -270,13 +273,13 @@ class MessageBubble extends StatelessWidget {
 
     if (platform == Platform.whatsapp) {
       final clipper = WhatsAppBubbleClipper(
-          isSender: isSender, isFirstInGroup: isFirstInGroup);
+          isSender: effectiveSender, isFirstInGroup: isFirstInGroup);
       final bubbleColor =
           isSender ? platformTheme.senderBubble : platformTheme.receiverBubble;
 
       // Tail side padding: the WhatsApp tail eats ~6px on its side
       final double tailPad = isFirstInGroup ? 6.0 : 0.0;
-      final EdgeInsets outerPad = isSender
+      final EdgeInsets outerPad = effectiveSender
           ? EdgeInsets.fromLTRB(10, 6, 10 + tailPad, 6)
           : EdgeInsets.fromLTRB(10 + tailPad, 6, 10, 6);
 
@@ -545,7 +548,7 @@ class MessageBubble extends StatelessWidget {
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: _getMessengerInstagramBorderRadius(
-            isSender,
+            isArabic ? !isSender : isSender,
             isFirstInGroup,
             isLastInGroup,
             platformTheme.bubbleRadius,
@@ -1078,21 +1081,31 @@ class _CallContent extends StatelessWidget {
     this.isBlockedMe = false,
   });
 
-  String _formatCallDuration(Duration? d) {
+  String _formatCallDuration(Duration? d, bool isArabic) {
     if (d == null || d == Duration.zero) return '';
     if (d.inMinutes > 0) {
       final mins = d.inMinutes;
       final secs = d.inSeconds % 60;
       if (secs > 0) {
+        if (isArabic) {
+          return '$mins د $secs ث';
+        }
         return '$mins min $secs sec';
       }
+      if (isArabic) {
+        return '$mins د';
+      }
       return '$mins min';
+    }
+    if (isArabic) {
+      return '${d.inSeconds} ث';
     }
     return '${d.inSeconds} sec';
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isArabic = Provider.of<ThemeProvider>(context).isArabic;
     final isVideo = message.type == MessageType.videoCall;
     final isMissed = message.text.toLowerCase().contains('missed') ||
         message.text.toLowerCase().contains('declined') ||
@@ -1111,21 +1124,44 @@ class _CallContent extends StatelessWidget {
         : (isSender && platformTheme.senderText == Colors.white ? Colors.white : const Color(0xFF54656F));
 
     // Dynamic title and details
-    final String callTitle = isVideo ? 'Video Call' : 'Voice Call';
+    String callTitle = '';
+    if (isArabic) {
+      callTitle = isVideo ? 'مكالمة فيديو' : 'مكالمة صوتية';
+    } else {
+      callTitle = isVideo ? 'Video Call' : 'Voice Call';
+    }
+
     String callSubtitle = '';
 
     if (message.text == 'Answered' || message.text.isEmpty) {
-      final dur = _formatCallDuration(message.audioDuration);
-      callSubtitle = dur.isNotEmpty ? 'Answered • $dur' : 'Answered';
+      final dur = _formatCallDuration(message.audioDuration, isArabic);
+      if (isArabic) {
+        callSubtitle = dur.isNotEmpty ? 'تم الرد عليها • $dur' : 'تم الرد عليها';
+      } else {
+        callSubtitle = dur.isNotEmpty ? 'Answered • $dur' : 'Answered';
+      }
     } else {
-      callSubtitle = message.text; // "Missed", "Declined", "No Answer"
+      final textLower = message.text.toLowerCase();
+      if (isArabic) {
+        if (textLower == 'missed') {
+          callSubtitle = 'فائتة';
+        } else if (textLower == 'declined') {
+          callSubtitle = 'مرفوضة';
+        } else if (textLower == 'no answer') {
+          callSubtitle = 'لم يتم الرد';
+        } else {
+          callSubtitle = message.text;
+        }
+      } else {
+        callSubtitle = message.text; // "Missed", "Declined", "No Answer"
+      }
     }
 
     if (platform == Platform.whatsapp) {
       return Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 12, right: 40),
+            padding: EdgeInsets.only(bottom: 12, right: isArabic ? 0 : 40, left: isArabic ? 40 : 0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1172,11 +1208,16 @@ class _CallContent extends StatelessWidget {
           ),
           Positioned(
             bottom: -2,
-            right: 0,
+            left: isArabic ? 0 : null,
+            right: isArabic ? null : 0,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                if (isArabic && isSender) ...[
+                  _StatusTick(status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
+                  const SizedBox(width: 3),
+                ],
                 Text(
                   message.formattedTime,
                   style: platformTheme.timestampStyle.copyWith(
@@ -1184,7 +1225,7 @@ class _CallContent extends StatelessWidget {
                     fontSize: 10.5,
                   ),
                 ),
-                if (isSender) ...[
+                if (!isArabic && isSender) ...[
                   const SizedBox(width: 3),
                   _StatusTick(status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
                 ],
@@ -1445,9 +1486,25 @@ class _ReplyPreviewHeader extends StatelessWidget {
         platformTheme.chatBg.value == 0xFF000000 ||
         platformTheme.chatBg.value == 0xFF0B0C0E;
 
+    final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+    String displayName = repliedToSenderName;
+    if (isArabicLocale) {
+      if (displayName == 'You') {
+        displayName = 'أنت';
+      } else if (displayName == 'Contact') {
+        displayName = 'الطرف الآخر';
+      }
+    } else {
+      if (displayName == 'أنت') {
+        displayName = 'You';
+      } else if (displayName == 'الطرف الآخر') {
+        displayName = 'Contact';
+      }
+    }
+
     // Detect RTL from the quoted content itself
     final bool isTextRtl =
-        _isArabic(repliedToText) || _isArabic(repliedToSenderName);
+        _isArabic(repliedToText) || _isArabic(displayName);
 
     // ── Per-platform colours ──────────────────────────────────────────────────
     Color barColor;
@@ -1542,7 +1599,7 @@ class _ReplyPreviewHeader extends StatelessWidget {
                       children: [
                         // Quoted sender name
                         Text(
-                          repliedToSenderName,
+                          displayName,
                           textAlign:
                               isTextRtl ? TextAlign.right : TextAlign.left,
                           style: TextStyle(
