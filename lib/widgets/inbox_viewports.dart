@@ -11,11 +11,13 @@ import '../utils/language_helper.dart';
 class PlatformInboxViewport extends StatelessWidget {
   final ChatSession session;
   final PlatformTheme platformTheme;
+  final bool hideStatusBar;
 
   const PlatformInboxViewport({
     super.key,
     required this.session,
     required this.platformTheme,
+    this.hideStatusBar = false,
   });
 
   @override
@@ -43,7 +45,8 @@ class PlatformInboxViewport extends StatelessWidget {
       child: Column(
         children: [
           // Simulated native System Status Bar
-          FakeStatusBar(
+          if (!hideStatusBar)
+            FakeStatusBar(
             time: session.fakeTime,
             battery: session.fakeBattery,
             hasWifi: session.fakeWifi,
@@ -410,9 +413,12 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
                       ),
                       decoration: InputDecoration(
                         isDense: true,
+                        filled: false,
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 10),
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                         hintText: isAr
                             ? 'اسأل Meta AI أو ابحث'
                             : 'Ask Meta AI or search',

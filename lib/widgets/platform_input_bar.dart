@@ -141,7 +141,7 @@ class _WhatsAppInput extends StatelessWidget {
     );
 
     return Container(
-      color: theme.inputBarBg,
+      color: theme.chatBg,
       padding: const EdgeInsets.fromLTRB(6, 4, 6, 8),
       child: Row(
         children: isArabic

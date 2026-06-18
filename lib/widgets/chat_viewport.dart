@@ -13,11 +13,13 @@ import '../utils/language_helper.dart';
 class ChatViewport extends StatelessWidget {
   final ChatSession session;
   final PlatformTheme platformTheme;
+  final bool hideStatusBar;
 
   const ChatViewport({
     super.key,
     required this.session,
     required this.platformTheme,
+    this.hideStatusBar = false,
   });
 
   @override
@@ -27,7 +29,8 @@ class ChatViewport extends StatelessWidget {
       child: Column(
         children: [
           // Fake system status bar
-          FakeStatusBar(
+          if (!hideStatusBar)
+            FakeStatusBar(
             time: session.fakeTime,
             battery: session.fakeBattery,
             hasWifi: session.fakeWifi,

@@ -112,7 +112,7 @@ class PlatformTheme {
     receiverBubble: Color(0xFF1F2C34),
     receiverText: Color(0xFFE9EDEF),
     inputBarBg: Color(0xFF1F2C34),
-    inputFieldBg: Color(0xFF2A3942),
+    inputFieldBg: const Color(0xFF1F2C34),
     sendButtonColor: Color(0xFF00A884),
     timestampColor: Color(0xFF8696A0),
     tickColor: Color(0xFF8696A0),

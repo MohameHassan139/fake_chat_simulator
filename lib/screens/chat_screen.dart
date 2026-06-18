@@ -1,5 +1,5 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -26,6 +26,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   bool _isCapturing = false;
   bool _showEditor = true;
   bool _isWebRecording = false;
+  bool _isFullScreenRecordMode = false;
   late AnimationController _panelAnimController;
   late Animation<double> _panelAnimation;
 
@@ -133,93 +134,154 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
     final platformTheme = PlatformTheme.of(session.platform, isDark: session.isDarkMode);
 
-    Widget bodyContent = Column(
-      children: [
-        // ── App top bar (always dark, part of our editor UI) ────────────
-        _buildTopBar(context, session),
+    Widget bodyContent;
 
-        // ── Phone mockup with screenshot boundary ───────────────────────
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: _showEditor ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    // Phone frame + screenshot zone
-                    _buildPhoneFrame(context, session, platformTheme, constraints),
-
-                    // Sender toggle bar
-                    if (_showEditor) _buildSenderToggle(context, chatProvider),
-                  ],
-                ),
-              );
-            },
+    if (_isFullScreenRecordMode) {
+      bodyContent = Focus(
+        autofocus: true,
+        onKeyEvent: (FocusNode node, KeyEvent event) {
+          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
+            setState(() {
+              _isFullScreenRecordMode = false;
+              if (_isWebRecording) {
+                _isWebRecording = false;
+                ScreenshotHelper.stopScreenRecord();
+              }
+            });
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: GestureDetector(
+          onDoubleTap: () {
+            setState(() {
+              _isFullScreenRecordMode = false;
+              if (_isWebRecording) {
+                _isWebRecording = false;
+                ScreenshotHelper.stopScreenRecord();
+              }
+            });
+          },
+          child: Screenshot(
+            controller: _screenshotController,
+            child: chatProvider.viewChatList
+                ? PlatformInboxViewport(
+                    session: session,
+                    platformTheme: platformTheme,
+                    hideStatusBar: true,
+                  )
+                : ChatViewport(
+                    session: session,
+                    platformTheme: platformTheme,
+                    hideStatusBar: true,
+                  ),
           ),
         ),
-
-        // ── Editor panel (slides in/out, NEVER captured) ─────────────────
-        SizeTransition(
-          sizeFactor: _panelAnimation,
-          axisAlignment: -1,
-          child: EditorPanel(
-            onCapture: _captureScreenshot,
-            isCapturing: _isCapturing,
-          ),
-        ),
-      ],
-    );
-
-    if (chatProvider.isPlayingConversation) {
-      bodyContent = Stack(
+      );
+    } else {
+      bodyContent = Column(
         children: [
-          bodyContent,
-          Positioned(
-            bottom: 24,
-            left: 20,
-            right: 20,
-            child: _buildRecordingHUD(context, chatProvider),
+          // ── App top bar (always dark, part of our editor UI) ────────────
+          _buildTopBar(context, session),
+
+          // ── Phone mockup with screenshot boundary ───────────────────────
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: _showEditor ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      // Phone frame + screenshot zone
+                      _buildPhoneFrame(context, session, platformTheme, constraints),
+
+                      // Sender toggle bar
+                      if (_showEditor) _buildSenderToggle(context, chatProvider),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // ── Editor panel (slides in/out, NEVER captured) ─────────────────
+          SizeTransition(
+            sizeFactor: _panelAnimation,
+            axisAlignment: -1,
+            child: EditorPanel(
+              onCapture: _captureScreenshot,
+              isCapturing: _isCapturing,
+            ),
           ),
         ],
       );
+
+      if (_isWebRecording) {
+        bodyContent = Stack(
+          children: [
+            bodyContent,
+            Positioned(
+              bottom: 24,
+              left: 20,
+              right: 20,
+              child: _buildRecordingHUD(context),
+            ),
+          ],
+        );
+      }
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      body: SafeArea(
-        child: bodyContent,
+    final Color systemStatusBarBg;
+    final Brightness systemStatusBarIconBrightness;
+
+    if (_isFullScreenRecordMode) {
+      systemStatusBarBg = platformTheme.statusBarBg;
+      final bool isLightStatusBarText = session.platform == Platform.whatsapp || session.isDarkMode;
+      systemStatusBarIconBrightness = isLightStatusBarText ? Brightness.light : Brightness.dark;
+    } else {
+      systemStatusBarBg = Colors.transparent;
+      systemStatusBarIconBrightness = Brightness.light;
+    }
+
+    final systemOverlayStyle = SystemUiOverlayStyle(
+      statusBarColor: systemStatusBarBg,
+      statusBarIconBrightness: systemStatusBarIconBrightness,
+      statusBarBrightness: systemStatusBarIconBrightness == Brightness.light ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: _isFullScreenRecordMode ? platformTheme.statusBarBg : const Color(0xFF0D0D0D),
+      systemNavigationBarIconBrightness: _isFullScreenRecordMode
+          ? (systemStatusBarIconBrightness == Brightness.light ? Brightness.light : Brightness.dark)
+          : Brightness.light,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: systemOverlayStyle,
+      child: PopScope(
+        canPop: !_isFullScreenRecordMode,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_isFullScreenRecordMode) {
+            setState(() {
+              _isFullScreenRecordMode = false;
+              if (_isWebRecording) {
+                _isWebRecording = false;
+                ScreenshotHelper.stopScreenRecord();
+              }
+            });
+          }
+        },
+        child: Scaffold(
+          backgroundColor: _isFullScreenRecordMode ? platformTheme.statusBarBg : const Color(0xFF0D0D0D),
+          body: SafeArea(
+            child: bodyContent,
+          ),
+        ),
       ),
     );
   }
 
-  void _startChatPlayback(BuildContext context) {
-    final chatProvider = context.read<ChatProvider>();
-    
-    if (_showEditor) {
-      _toggleEditor();
-    }
 
-    chatProvider.startConversationPlayback(() {
-      if (mounted) {
-        setState(() {
-          if (_isWebRecording) {
-            _isWebRecording = false;
-            ScreenshotHelper.stopScreenRecord();
-          }
-        });
-        
-        final isAr = context.read<ThemeProvider>().isArabic;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isAr ? 'اكتمل تشغيل المحادثة تلقائيًا!' : 'Conversation playback completed!'),
-            backgroundColor: const Color(0xFF44BB44),
-          ),
-        );
-      }
-    });
-  }
 
-  Widget _buildRecordingHUD(BuildContext context, ChatProvider chatProvider) {
+  Widget _buildRecordingHUD(BuildContext context) {
     final isAr = context.read<ThemeProvider>().isArabic;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -260,7 +322,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  isAr ? 'تشغيل المحادثة تلقائيًا...' : 'PLAYING CONVERSATION...',
+                  isAr ? 'يجري تسجيل الشاشة كفيديو...' : 'RECORDING VIDEO...',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -269,42 +331,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   ),
                 ),
                 Text(
-                  _isWebRecording 
-                      ? (isAr ? 'يجري تسجيل الشاشة حاليًا' : 'Recording browser tab...')
-                      : (isAr ? 'شغّل مسجل الشاشة بهاتفك لالتقاطها' : 'Use device screen recorder to capture'),
+                  isAr ? 'يجري تسجيل الشاشة حاليًا' : 'Recording the simulator screen as video...',
                   style: const TextStyle(color: Colors.white54, fontSize: 10),
                 ),
               ],
             ),
           ),
-          if (kIsWeb && !_isWebRecording) ...[
-            IconButton(
-              icon: const Icon(Icons.videocam_rounded, color: Colors.blueAccent),
-              tooltip: isAr ? 'تسجيل كفيديو (Web)' : 'Record to Video (Web)',
-              onPressed: () async {
-                final success = await ScreenshotHelper.startScreenRecord();
-                if (success) {
-                  setState(() {
-                    _isWebRecording = true;
-                  });
-                }
-              },
-            ),
-            const SizedBox(width: 8),
-          ],
-          if (_isWebRecording) ...[
-            IconButton(
-              icon: const Icon(Icons.videocam_off_rounded, color: Colors.redAccent),
-              tooltip: isAr ? 'إيقاف التسجيل' : 'Stop Web Record',
-              onPressed: () {
-                setState(() {
-                  _isWebRecording = false;
-                });
-                ScreenshotHelper.stopScreenRecord();
-              },
-            ),
-            const SizedBox(width: 8),
-          ],
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE1306C),
@@ -315,13 +347,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             icon: const Icon(Icons.stop_rounded, size: 16),
             label: Text(isAr ? 'إيقاف' : 'Stop', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             onPressed: () {
-              if (_isWebRecording) {
-                ScreenshotHelper.stopScreenRecord();
-                setState(() {
-                  _isWebRecording = false;
-                });
-              }
-              chatProvider.stopConversationPlayback();
+              setState(() {
+                _isWebRecording = false;
+              });
+              ScreenshotHelper.stopScreenRecord();
             },
           ),
         ],
@@ -406,33 +435,64 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             ),
           ),
           const SizedBox(width: 8),
-          // Play/Record button
+          // Record Chat button
           GestureDetector(
-            onTap: () {
-              if (chatProvider.isPlayingConversation) {
-                if (_isWebRecording) {
-                  ScreenshotHelper.stopScreenRecord();
+            onTap: () async {
+              final isAr = Provider.of<ThemeProvider>(context, listen: false).isArabic;
+              if (_isWebRecording) {
+                setState(() {
+                  _isWebRecording = false;
+                  _isFullScreenRecordMode = false;
+                });
+                ScreenshotHelper.stopScreenRecord();
+              } else {
+                if (!kIsWeb) {
                   setState(() {
-                    _isWebRecording = false;
+                    _isFullScreenRecordMode = true;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isAr
+                            ? 'تم الدخول في وضع ملء الشاشة للتسجيل. يرجى استخدام مسجل الشاشة المدمج بجهازك للتسجيل. اضغط على خروج للعودة.'
+                            : 'Entering full-screen mode. Use your device\'s built-in recorder to capture. Tap the exit button to return.',
+                      ),
+                      duration: const Duration(seconds: 5),
+                      behavior: SnackBarBehavior.floating,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                setState(() {
+                  _isFullScreenRecordMode = true;
+                });
+                final success = await ScreenshotHelper.startScreenRecord();
+                if (success) {
+                  setState(() {
+                    _isWebRecording = true;
+                  });
+                } else {
+                  setState(() {
+                    _isFullScreenRecordMode = false;
                   });
                 }
-                chatProvider.stopConversationPlayback();
-              } else {
-                _startChatPlayback(context);
               }
             },
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: chatProvider.isPlayingConversation
+                color: _isWebRecording
                     ? const Color(0xFFE1306C)
                     : const Color(0xFF242424),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                chatProvider.isPlayingConversation ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                _isWebRecording ? Icons.videocam_off_rounded : Icons.videocam_rounded,
                 size: 18,
-                color: chatProvider.isPlayingConversation ? Colors.white : Colors.white70,
+                color: _isWebRecording ? Colors.white : Colors.white70,
               ),
             ),
           ),
