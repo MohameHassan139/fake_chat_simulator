@@ -977,7 +977,7 @@ class _TextContent extends StatelessWidget {
 
 // ─── Image Content ────────────────────────────────────────────────────────────
 
-class _ImageContent extends StatelessWidget {
+class _ImageContent extends StatefulWidget {
   final ChatMessage message;
   final bool isSender;
   final Platform platform;
@@ -993,64 +993,218 @@ class _ImageContent extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final double innerRadius = platform == Platform.whatsapp ? 6.0 : platformTheme.bubbleRadius;
+  State<_ImageContent> createState() => _ImageContentState();
+}
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(innerRadius),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+class _ImageContentState extends State<_ImageContent> {
+  double? _imageWidth;
+  double? _imageHeight;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImageDimensions();
+  }
+
+  @override
+  void didUpdateWidget(_ImageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.imageBytes != widget.message.imageBytes) {
+      _loadImageDimensions();
+    }
+  }
+
+  @override
+  void dispose() {
+    _cleanImageStream();
+    super.dispose();
+  }
+
+  void _cleanImageStream() {
+    if (_imageStream != null && _imageListener != null) {
+      _imageStream!.removeListener(_imageListener!);
+    }
+    _imageStream = null;
+    _imageListener = null;
+  }
+
+  void _loadImageDimensions() {
+    _cleanImageStream();
+    if (widget.message.imageBytes == null) {
+      setState(() {
+        _imageWidth = null;
+        _imageHeight = null;
+      });
+      return;
+    }
+
+    try {
+      final ImageProvider provider = MemoryImage(widget.message.imageBytes!);
+      _imageStream = provider.resolve(ImageConfiguration.empty);
+      _imageListener = ImageStreamListener(
+        (ImageInfo info, bool _) {
+          if (mounted) {
+            setState(() {
+              _imageWidth = info.image.width.toDouble();
+              _imageHeight = info.image.height.toDouble();
+            });
+          }
+        },
+        onError: (dynamic exception, StackTrace? stackTrace) {
+          debugPrint('Error loading image dimensions: $exception');
+        },
+      );
+      _imageStream!.addListener(_imageListener!);
+    } catch (e) {
+      debugPrint('Error initiating image resolve: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double innerRadius = widget.platform == Platform.whatsapp ? 6.0 : widget.platformTheme.bubbleRadius;
+
+    // Calculate responsive width and height
+    double bubbleWidth = 220.0;
+    double bubbleHeight = 160.0;
+
+    if (widget.message.imageBytes != null) {
+      if (_imageWidth != null && _imageHeight != null && _imageHeight! > 0) {
+        final double ar = _imageWidth! / _imageHeight!;
+        final double clampedAr = ar.clamp(0.55, 1.8);
+        
+        final double maxBubbleWidth = widget.platform == Platform.instagram ? 280.0 : 250.0;
+        final double maxBubbleHeight = 300.0;
+
+        if (clampedAr >= 1.0) {
+          bubbleWidth = maxBubbleWidth;
+          bubbleHeight = maxBubbleWidth / clampedAr;
+        } else {
+          bubbleHeight = maxBubbleHeight;
+          bubbleWidth = maxBubbleHeight * clampedAr;
+        }
+      } else {
+        // Fallback/Loading default sizing
+        bubbleWidth = widget.platform == Platform.instagram ? 240.0 : 220.0;
+        bubbleHeight = 160.0;
+      }
+    }
+
+    final bool hasCaption = widget.message.text.isNotEmpty;
+    final bool isWhatsApp = widget.platform == Platform.whatsapp;
+
+    // If it's WhatsApp and has no caption, we overlay the timestamp on the image
+    final bool shouldOverlayTimestamp = isWhatsApp && !hasCaption;
+
+    Widget imageWidget;
+    if (widget.message.imageBytes != null) {
+      imageWidget = SizedBox(
+        width: bubbleWidth,
+        height: bubbleHeight,
+        child: Image.memory(
+          widget.message.imageBytes!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: bubbleWidth,
+            height: bubbleHeight,
+            color: Colors.grey[300],
+            child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+          ),
+        ),
+      );
+    } else {
+      imageWidget = Container(
+        width: bubbleWidth,
+        height: bubbleHeight,
+        color: Colors.grey[300],
+        child: const Icon(Icons.image, size: 40, color: Colors.grey),
+      );
+    }
+
+    if (shouldOverlayTimestamp) {
+      imageWidget = Stack(
         children: [
-          if (message.imageBytes != null)
-            SizedBox(
-              width: 220,
-              height: 160,
-              child: Image.memory(
-                message.imageBytes!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 220,
-                  height: 160,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
-                ),
+          imageWidget,
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(10),
               ),
-            )
-          else
-            Container(
-              width: 220,
-              height: 160,
-              color: Colors.grey[300],
-              child: const Icon(Icons.image, size: 40, color: Colors.grey),
-            ),
-          if (message.text.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
-              child: Text(
-                message.text,
-                style: platformTheme.messageStyle.copyWith(
-                  color: isSender ? platformTheme.senderText : platformTheme.receiverText,
-                ),
-              ),
-            ),
-          if (platform != Platform.messenger && platform != Platform.instagram)
-            Padding(
-              padding: EdgeInsets.fromLTRB(10, message.text.isNotEmpty ? 0 : 6, 10, 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    message.formattedTime,
-                    style: platformTheme.timestampStyle,
+                    widget.message.formattedTime,
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
                   ),
-                  if (platform == Platform.whatsapp && isSender) ...[
+                  if (widget.isSender) ...[
                     const SizedBox(width: 4),
-                    _StatusTick(status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
+                    _StatusTick(
+                      status: widget.message.status,
+                      platformTheme: widget.platformTheme,
+                      forceSentTick: widget.isBlockedMe,
+                      colorOverride: const Color(0xFF34B7F1), // blue ticks on media overlay
+                    ),
                   ],
                 ],
               ),
             ),
+          ),
         ],
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(innerRadius),
+      child: Container(
+        width: bubbleWidth,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            imageWidget,
+            if (hasCaption)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+                child: Text(
+                  widget.message.text,
+                  style: widget.platformTheme.messageStyle.copyWith(
+                    color: widget.isSender ? widget.platformTheme.senderText : widget.platformTheme.receiverText,
+                  ),
+                ),
+              ),
+            // Timestamp row (only if we did not overlay it, and platform is NOT messenger/instagram)
+            if (!shouldOverlayTimestamp &&
+                widget.platform != Platform.messenger &&
+                widget.platform != Platform.instagram)
+              Padding(
+                padding: EdgeInsets.fromLTRB(10, hasCaption ? 0 : 6, 10, 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.message.formattedTime,
+                      style: widget.platformTheme.timestampStyle,
+                    ),
+                    if (widget.platform == Platform.whatsapp && widget.isSender) ...[
+                      const SizedBox(width: 4),
+                      _StatusTick(
+                        status: widget.message.status,
+                        platformTheme: widget.platformTheme,
+                        forceSentTick: widget.isBlockedMe,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1668,6 +1822,11 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   String? _resolvedVideoPath;
   bool _isInitializing = false;
 
+  double? _thumbnailWidth;
+  double? _thumbnailHeight;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageListener;
+
   // Timer for fallback/simulation when videoBytes is null
   Timer? _timer;
 
@@ -1676,6 +1835,48 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     super.initState();
     _totalDuration = widget.message.audioDuration ?? const Duration(seconds: 15);
     _resolveSource();
+    _loadThumbnailDimensions();
+  }
+
+  @override
+  void didUpdateWidget(_VideoPlayerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.imageBytes != widget.message.imageBytes) {
+      _loadThumbnailDimensions();
+    }
+  }
+
+  void _loadThumbnailDimensions() {
+    _cleanImageStream();
+    if (widget.message.imageBytes == null) return;
+    try {
+      final ImageProvider provider = MemoryImage(widget.message.imageBytes!);
+      _imageStream = provider.resolve(ImageConfiguration.empty);
+      _imageListener = ImageStreamListener(
+        (ImageInfo info, bool _) {
+          if (mounted) {
+            setState(() {
+              _thumbnailWidth = info.image.width.toDouble();
+              _thumbnailHeight = info.image.height.toDouble();
+            });
+          }
+        },
+        onError: (dynamic exception, StackTrace? stackTrace) {
+          debugPrint('Error loading video thumbnail dimensions: $exception');
+        },
+      );
+      _imageStream!.addListener(_imageListener!);
+    } catch (e) {
+      debugPrint('Error loading video thumbnail stream: $e');
+    }
+  }
+
+  void _cleanImageStream() {
+    if (_imageStream != null && _imageListener != null) {
+      _imageStream!.removeListener(_imageListener!);
+    }
+    _imageStream = null;
+    _imageListener = null;
   }
 
   Future<void> _resolveSource() async {
@@ -1737,6 +1938,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
 
   @override
   void dispose() {
+    _cleanImageStream();
     _timer?.cancel();
     _controller?.dispose();
     super.dispose();
@@ -1799,6 +2001,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
         : 0.0;
 
     final isWhatsApp = widget.platform == Platform.whatsapp;
+    final double innerRadius = widget.platform == Platform.whatsapp ? 6.0 : widget.platformTheme.bubbleRadius;
 
     if (widget.message.isVideoMessage) {
       // Circular Video Note layout (Screenshot 1 & 2)
@@ -1969,41 +2172,61 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
       );
     } else {
       // Standard Video message layout (Rectangular attachment)
-      return Container(
-        width: 240,
-        height: 160,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: const Color(0xFF1E1E1E),
+      // Calculate responsive width and height
+      double? ar;
+      if (_isInitialized && _controller != null) {
+        ar = _controller!.value.aspectRatio;
+      } else if (_thumbnailWidth != null && _thumbnailHeight != null && _thumbnailHeight! > 0) {
+        ar = _thumbnailWidth! / _thumbnailHeight!;
+      }
+
+      final double clampedAr = (ar ?? 1.5).clamp(0.55, 1.8);
+      
+      final double maxBubbleWidth = widget.platform == Platform.instagram ? 280.0 : 250.0;
+      final double maxBubbleHeight = 300.0;
+
+      double bubbleWidth = 240.0;
+      double bubbleHeight = 160.0;
+
+      if (clampedAr >= 1.0) {
+        bubbleWidth = maxBubbleWidth;
+        bubbleHeight = maxBubbleWidth / clampedAr;
+      } else {
+        bubbleHeight = maxBubbleHeight;
+        bubbleWidth = maxBubbleHeight * clampedAr;
+      }
+
+      final bool hasCaption = widget.message.text.isNotEmpty;
+      final bool shouldOverlayTimestamp = isWhatsApp && !hasCaption;
+
+      Widget videoBody = Container(
+        width: bubbleWidth,
+        height: bubbleHeight,
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
             // Frame image or video player
             if (_isInitialized && _controller != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox.expand(
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    clipBehavior: Clip.hardEdge,
-                    child: SizedBox(
-                      width: _controller!.value.size.width,
-                      height: _controller!.value.size.height,
-                      child: VideoPlayer(_controller!),
-                    ),
+              SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox(
+                    width: _controller!.value.size.width,
+                    height: _controller!.value.size.height,
+                    child: VideoPlayer(_controller!),
                   ),
                 ),
               )
             else if (widget.message.imageBytes != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.memory(
-                  widget.message.imageBytes!,
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+              Image.memory(
+                widget.message.imageBytes!,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
               )
             else
               Center(
@@ -2054,35 +2277,37 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
               ),
             ),
 
-            // Timestamp and ticks badge in bottom corner
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.message.formattedTime,
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
-                    ),
-                    if (widget.isSender) ...[
-                      const SizedBox(width: 4),
-                      _StatusTick(
-                        status: widget.message.status,
-                        platformTheme: widget.platformTheme,
-                        forceSentTick: widget.isBlockedMe,
+            // Timestamp and ticks badge overlayed ONLY if we should overlay
+            if (shouldOverlayTimestamp)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.message.formattedTime,
+                        style: const TextStyle(color: Colors.white, fontSize: 10),
                       ),
+                      if (widget.isSender) ...[
+                        const SizedBox(width: 4),
+                        _StatusTick(
+                          status: widget.message.status,
+                          platformTheme: widget.platformTheme,
+                          forceSentTick: widget.isBlockedMe,
+                          colorOverride: const Color(0xFF34B7F1), // blue ticks
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
 
             // Linear Progress Ticker overlay at the very bottom
             Positioned(
@@ -2090,7 +2315,6 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
               left: 0,
               right: 0,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                 child: LinearProgressIndicator(
                   value: progressPct,
                   minHeight: 3,
@@ -2100,6 +2324,54 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
               ),
             ),
           ],
+        ),
+      );
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(innerRadius),
+        child: Container(
+          width: bubbleWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              videoBody,
+              if (hasCaption)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+                  child: Text(
+                    widget.message.text,
+                    style: widget.platformTheme.messageStyle.copyWith(
+                      color: widget.isSender ? widget.platformTheme.senderText : widget.platformTheme.receiverText,
+                    ),
+                  ),
+                ),
+              // Timestamp row (only if not overlayed, and platform is NOT messenger/instagram)
+              if (!shouldOverlayTimestamp &&
+                  widget.platform != Platform.messenger &&
+                  widget.platform != Platform.instagram)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(10, hasCaption ? 0 : 6, 10, 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.message.formattedTime,
+                        style: widget.platformTheme.timestampStyle,
+                      ),
+                      if (widget.platform == Platform.whatsapp && widget.isSender) ...[
+                        const SizedBox(width: 4),
+                        _StatusTick(
+                          status: widget.message.status,
+                          platformTheme: widget.platformTheme,
+                          forceSentTick: widget.isBlockedMe,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       );
     }
