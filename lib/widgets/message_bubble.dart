@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' as io;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -10,6 +11,7 @@ import '../utils/video_helper.dart';
 import '../utils/audio_helper.dart';
 import '../themes/platform_themes.dart';
 import '../providers/theme_provider.dart';
+import '../providers/chat_provider.dart';
 
 bool _isArabic(String text) {
   final arabicRegExp = RegExp(
@@ -138,6 +140,50 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      );
+    }
+
+    final hasReply = message.repliedToId != null && message.repliedToText != null;
+    if (hasReply && (platform == Platform.messenger || platform == Platform.instagram)) {
+      final String replyLabelText = _getMessengerReplyLabel(
+        isSender,
+        message.repliedToSenderName ?? 'Contact',
+        contactUser.name,
+        isArabicLocale,
+      );
+      final labelColor = (isSender ? platformTheme.senderText : platformTheme.receiverText).withOpacity(0.45);
+
+      bubble = Column(
+        crossAxisAlignment: isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, left: 4, right: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Transform.flip(
+                  flipX: isArabicLocale,
+                  child: Icon(
+                    Icons.reply_rounded,
+                    size: 12,
+                    color: labelColor,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  replyLabelText,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: labelColor,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          bubble,
         ],
       );
     }
@@ -274,6 +320,7 @@ class MessageBubble extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _ReplyPreviewHeader(
+                  repliedToId: message.repliedToId,
                   repliedToText: message.repliedToText!,
                   repliedToSenderName: message.repliedToSenderName ?? 'Contact',
                   isSender: isSender,
@@ -1542,12 +1589,13 @@ class _AudioPlayerWidgetState extends State<_AudioPlayerWidget> {
           const SizedBox(width: 8),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (!widget.message.isVoiceNote) ...[
                   Text(
                     widget.message.fileName ?? 'Audio file',
+                    textAlign: TextAlign.start,
                     style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1557,7 +1605,6 @@ class _AudioPlayerWidgetState extends State<_AudioPlayerWidget> {
                 // Seekbar Progress
                 Container(
                   height: 3,
-                  width: double.infinity,
                   decoration: BoxDecoration(
                     color: textColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(2),
@@ -2481,6 +2528,7 @@ class _DoubleTick extends StatelessWidget {
 }
 
 class _ReplyPreviewHeader extends StatelessWidget {
+  final String? repliedToId;
   final String repliedToText;
   final String repliedToSenderName;
   final bool isSender;
@@ -2489,6 +2537,7 @@ class _ReplyPreviewHeader extends StatelessWidget {
   final bool bubbleIsRtl;
 
   const _ReplyPreviewHeader({
+    this.repliedToId,
     required this.repliedToText,
     required this.repliedToSenderName,
     required this.isSender,
@@ -2520,9 +2569,108 @@ class _ReplyPreviewHeader extends StatelessWidget {
       }
     }
 
+    // Lookup the referenced message to extract type and media details
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    ChatMessage? repliedToMessage;
+    if (repliedToId != null) {
+      for (final m in chatProvider.activeMessages) {
+        if (m.id == repliedToId) {
+          repliedToMessage = m;
+          break;
+        }
+      }
+    }
+
+    String formatReplyAudioDuration(Duration? d) {
+      if (d == null || d == Duration.zero) return '';
+      final mins = d.inMinutes;
+      final secs = d.inSeconds % 60;
+      final secsStr = secs.toString().padLeft(2, '0');
+      return ' ($mins:$secsStr)';
+    }
+
+    // Determine the content text & icon for the quoted message
+    IconData? mediaIcon;
+    String displayText = repliedToText;
+
+    final bool isMessengerOrInstagram = platform == Platform.messenger || platform == Platform.instagram;
+
+    if (repliedToMessage != null) {
+      switch (repliedToMessage.type) {
+        case MessageType.image:
+          if (isMessengerOrInstagram) {
+            mediaIcon = Icons.attachment_rounded;
+            displayText = repliedToMessage.text.isNotEmpty
+                ? repliedToMessage.text
+                : (isArabicLocale ? 'مرفق' : 'Attachment');
+          } else {
+            mediaIcon = Icons.camera_alt_rounded;
+            displayText = repliedToMessage.text.isNotEmpty
+                ? repliedToMessage.text
+                : (isArabicLocale ? 'صورة' : 'Photo');
+          }
+          break;
+        case MessageType.video:
+          if (isMessengerOrInstagram) {
+            mediaIcon = Icons.attachment_rounded;
+            displayText = repliedToMessage.text.isNotEmpty
+                ? repliedToMessage.text
+                : (isArabicLocale ? 'مرفق' : 'Attachment');
+          } else {
+            mediaIcon = Icons.videocam_rounded;
+            final durationStr = formatReplyAudioDuration(repliedToMessage.audioDuration);
+            displayText = repliedToMessage.text.isNotEmpty
+                ? '${repliedToMessage.text}$durationStr'
+                : '${isArabicLocale ? 'مقطع فيديو' : 'Video'}$durationStr';
+          }
+          break;
+        case MessageType.audio:
+          if (isMessengerOrInstagram) {
+            mediaIcon = Icons.attachment_rounded;
+            displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+          } else {
+            mediaIcon = repliedToMessage.isVoiceNote ? Icons.mic_rounded : Icons.audiotrack_rounded;
+            final durationStr = formatReplyAudioDuration(repliedToMessage.audioDuration);
+            final typeLabel = isArabicLocale ? 'رسالة صوتية' : 'Voice message';
+            displayText = '$typeLabel$durationStr';
+          }
+          break;
+        default:
+          displayText = repliedToMessage.text.isNotEmpty ? repliedToMessage.text : repliedToText;
+      }
+    } else {
+      // Fallback if message object isn't found in memory, parse text prefix
+      final lowerText = repliedToText.toLowerCase();
+      if (lowerText.contains('[image]') || lowerText.contains('[photo]') || lowerText.contains('صورة')) {
+        if (isMessengerOrInstagram) {
+          mediaIcon = Icons.attachment_rounded;
+          displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+        } else {
+          mediaIcon = Icons.camera_alt_rounded;
+          displayText = isArabicLocale ? 'صورة' : 'Photo';
+        }
+      } else if (lowerText.contains('[video]') || lowerText.contains('فيديو') || lowerText.contains('مقطع')) {
+        if (isMessengerOrInstagram) {
+          mediaIcon = Icons.attachment_rounded;
+          displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+        } else {
+          mediaIcon = Icons.videocam_rounded;
+          displayText = isArabicLocale ? 'فيديو' : 'Video';
+        }
+      } else if (lowerText.contains('[audio]') || lowerText.contains('[voice]') || lowerText.contains('صوتية') || lowerText.contains('صوتي')) {
+        if (isMessengerOrInstagram) {
+          mediaIcon = Icons.attachment_rounded;
+          displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+        } else {
+          mediaIcon = Icons.mic_rounded;
+          displayText = isArabicLocale ? 'رسالة صوتية' : 'Voice note';
+        }
+      }
+    }
+
     // Detect RTL from the quoted content itself
     final bool isTextRtl =
-        _isArabic(repliedToText) || _isArabic(displayName);
+        _isArabic(displayText) || _isArabic(displayName);
 
     // ── Per-platform colours ──────────────────────────────────────────────────
     Color barColor;
@@ -2571,42 +2719,110 @@ class _ReplyPreviewHeader extends StatelessWidget {
         break;
     }
 
+    // Determine if we should display a thumbnail image/video preview
+    final msg = repliedToMessage;
+    final bool showThumbnail = msg != null &&
+        (msg.type == MessageType.image || msg.type == MessageType.video);
+    
+    final Uint8List? thumbnailBytes = showThumbnail ? msg.imageBytes : null;
+
+    Widget? thumbnailWidget;
+    if (showThumbnail) {
+      Widget imgWidget;
+      if (thumbnailBytes != null) {
+        imgWidget = Image.memory(
+          thumbnailBytes,
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+        );
+      } else {
+        // Fallback placeholder image when bytes are null, to look like a real app
+        final placeholderUrl = msg.type == MessageType.image
+            ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop'
+            : 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=120&h=120&fit=crop';
+        imgWidget = Image.network(
+          placeholderUrl,
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: 52,
+            height: 52,
+            color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+            child: Icon(
+              msg.type == MessageType.image
+                  ? Icons.image_rounded
+                  : Icons.videocam_rounded,
+              size: 16,
+              color: textColor.withOpacity(0.5),
+            ),
+          ),
+        );
+      }
+
+      if (msg.type == MessageType.video) {
+        thumbnailWidget = SizedBox(
+          width: 52,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(child: imgWidget),
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black38,
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        thumbnailWidget = SizedBox(
+          width: 52,
+          child: imgWidget,
+        );
+      }
+    }
+
     // ── Margins & radius ──────────────────────────────────────────────────────
-    // Real WhatsApp: the quote block has ~6px margin on all sides INSIDE the
-    // bubble's own padding. All corners rounded (6px). It's NOT edge-to-edge.
     const double qRadius = 6.0;
     const double qMarginH = 0.0; // bubble already has its own side padding
     const double qMarginTop = 0.0;
     const double qMarginBottom = 4.0; // small gap before message text
 
-    // In Arabic/RTL, the accent bar moves to the RIGHT side
-    final bool barOnRight = isTextRtl;
 
-    return Directionality(
-      // Force layout direction based on bubble content, not app locale
-      textDirection: isTextRtl ? TextDirection.rtl : TextDirection.ltr,
-      child: Container(
-        margin: const EdgeInsets.only(
-          top: qMarginTop,
-          left: qMarginH,
-          right: qMarginH,
-          bottom: qMarginBottom,
-        ),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(qRadius),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(qRadius),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Left accent bar (LTR)
-                if (!barOnRight) Container(width: 4, color: barColor),
 
-                // Quoted text
-                Expanded(
+    return Container(
+      margin: const EdgeInsets.only(
+        top: qMarginTop,
+        left: qMarginH,
+        right: qMarginH,
+        bottom: qMarginBottom,
+      ),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(qRadius),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(qRadius),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Accent bar is ALWAYS on the left
+              Container(width: 4, color: barColor),
+
+              // Quoted text in the middle
+              Expanded(
+                child: Directionality(
+                  textDirection: isTextRtl ? TextDirection.rtl : TextDirection.ltr,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
                     child: Column(
@@ -2631,28 +2847,44 @@ class _ReplyPreviewHeader extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 1),
-                        // Quoted message text (1 line like real WhatsApp)
-                        Text(
-                          repliedToText,
-                          textAlign:
-                              isTextRtl ? TextAlign.right : TextAlign.left,
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 12,
-                            height: 1.3,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        // Quoted message text with icon
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (mediaIcon != null) ...[
+                              Icon(
+                                mediaIcon,
+                                size: 13,
+                                color: textColor.withOpacity(0.85),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Expanded(
+                              child: Text(
+                                displayText,
+                                textAlign:
+                                    isTextRtl ? TextAlign.right : TextAlign.left,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 12,
+                                  height: 1.3,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ),
+              ),
 
-                // Right accent bar (RTL)
-                if (barOnRight) Container(width: 4, color: barColor),
-              ],
-            ),
+              // Thumbnail/placeholder is ALWAYS on the right
+              if (thumbnailWidget != null) thumbnailWidget,
+            ],
           ),
         ),
       ),
@@ -2704,3 +2936,24 @@ class _ForwardedHeader extends StatelessWidget {
     );
   }
 }
+
+String _getMessengerReplyLabel(bool isSender, String repliedToSenderName, String contactName, bool isArabic) {
+  final isQuotedMe = repliedToSenderName == 'You' || repliedToSenderName == 'أنت';
+  
+  if (isSender) {
+    if (isQuotedMe) {
+      return isArabic ? 'لقد قمت بالرد على نفسك' : 'You replied to yourself';
+    } else {
+      final name = contactName.isNotEmpty ? contactName : (isArabic ? 'الطرف الآخر' : 'Contact');
+      return isArabic ? 'لقد قمت بالرد على $name' : 'You replied to $name';
+    }
+  } else {
+    final name = contactName.isNotEmpty ? contactName : (isArabic ? 'الطرف الآخر' : 'Contact');
+    if (isQuotedMe) {
+      return isArabic ? 'تم الرد عليك بواسطة $name' : '$name replied to you';
+    } else {
+      return isArabic ? 'لقد قام $name بالرد على نفسه' : '$name replied to themselves';
+    }
+  }
+}
+

@@ -115,6 +115,48 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     super.dispose();
   }
 
+  ChatMessage? _getRepliedToMessageObj() {
+    if (_repliedToId == null) return null;
+    final chatProvider = context.read<ChatProvider>();
+    for (final m in chatProvider.activeMessages) {
+      if (m.id == _repliedToId) {
+        return m;
+      }
+    }
+    return null;
+  }
+
+  String _getMediaReplyLabelText(ChatMessage m, bool isMessengerOrInstagram) {
+    if (m.text.isNotEmpty) return m.text;
+    
+    final isArabicLocale = context.read<ThemeProvider>().isArabic;
+    if (isMessengerOrInstagram) {
+      return isArabicLocale ? 'مرفق' : 'Attachment';
+    }
+    
+    switch (m.type) {
+      case MessageType.image:
+        return isArabicLocale ? 'صورة' : 'Photo';
+      case MessageType.video:
+        final durationStr = _formatAudioDuration(m.audioDuration);
+        return isArabicLocale ? 'مقطع فيديو$durationStr' : 'Video$durationStr';
+      case MessageType.audio:
+        final durationStr = _formatAudioDuration(m.audioDuration);
+        final label = isArabicLocale ? 'رسالة صوتية' : 'Voice message';
+        return '$label$durationStr';
+      default:
+        return '[${m.type.name}]';
+    }
+  }
+
+  String _formatAudioDuration(Duration? d) {
+    if (d == null || d == Duration.zero) return '';
+    final mins = d.inMinutes;
+    final secs = d.inSeconds % 60;
+    final secsStr = secs.toString().padLeft(2, '0');
+    return ' ($mins:$secsStr)';
+  }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
@@ -561,47 +603,155 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
               _SLabel('Quoted Reply'),
               const SizedBox(height: 6),
               if (_repliedToId != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF242424),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 3.5,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                Builder(
+                  builder: (context) {
+                    final repliedToMsgObj = _getRepliedToMessageObj();
+                    IconData? quotedIcon;
+                    String quotedText = _repliedToText ?? '';
+                    final platform = session?.platform ?? Platform.whatsapp;
+                    final isMessengerOrInstagram = platform == Platform.messenger || platform == Platform.instagram;
+                    
+                    if (repliedToMsgObj != null) {
+                      quotedText = _getMediaReplyLabelText(repliedToMsgObj, isMessengerOrInstagram);
+                      if (isMessengerOrInstagram) {
+                        quotedIcon = Icons.attachment_rounded;
+                      } else {
+                        switch (repliedToMsgObj.type) {
+                          case MessageType.image:
+                            quotedIcon = Icons.camera_alt_rounded;
+                            break;
+                          case MessageType.video:
+                            quotedIcon = Icons.videocam_rounded;
+                            break;
+                          case MessageType.audio:
+                            quotedIcon = repliedToMsgObj.isVoiceNote ? Icons.mic_rounded : Icons.audiotrack_rounded;
+                            break;
+                          default:
+                            break;
+                        }
+                      }
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF242424),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _repliedToSenderName ?? 'Contact',
-                              style: const TextStyle(
-                                color: Color(0xFF4CAF50),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 3.5,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4CAF50),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _repliedToSenderName ?? 'Contact',
+                                  style: const TextStyle(
+                                    color: Color(0xFF4CAF50),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    if (quotedIcon != null) ...[
+                                      Icon(quotedIcon, size: 13, color: Colors.white54),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        quotedText,
+                                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                           if (repliedToMsgObj != null &&
+                              (repliedToMsgObj.type == MessageType.image || repliedToMsgObj.type == MessageType.video)) ...[
+                            const SizedBox(width: 10),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Builder(
+                                builder: (context) {
+                                  Widget imgWidget;
+                                  if (repliedToMsgObj.imageBytes != null) {
+                                    imgWidget = Image.memory(
+                                      repliedToMsgObj.imageBytes!,
+                                      width: 36,
+                                      height: 36,
+                                      fit: BoxFit.cover,
+                                    );
+                                  } else {
+                                    final placeholderUrl = repliedToMsgObj.type == MessageType.image
+                                        ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop'
+                                        : 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=100&h=100&fit=crop';
+                                    imgWidget = Image.network(
+                                      placeholderUrl,
+                                      width: 36,
+                                      height: 36,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        width: 36,
+                                        height: 36,
+                                        color: Colors.white12,
+                                        child: Icon(
+                                          repliedToMsgObj.type == MessageType.image
+                                              ? Icons.image_rounded
+                                              : Icons.videocam_rounded,
+                                          size: 14,
+                                          color: Colors.white38,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  if (repliedToMsgObj.type == MessageType.video) {
+                                    return SizedBox(
+                                      width: 36,
+                                      height: 36,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          Positioned.fill(child: imgWidget),
+                                          Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: const BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.black38,
+                                            ),
+                                            child: const Icon(
+                                              Icons.play_arrow_rounded,
+                                              size: 12,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    return imgWidget;
+                                  }
+                                }
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _repliedToText ?? '',
-                              style: const TextStyle(color: Colors.white70, fontSize: 12),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
                           ],
-                        ),
-                      ),
                       IconButton(
                         icon: const Icon(Icons.close_rounded, color: Colors.white38),
                         onPressed: () {
@@ -614,8 +764,10 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                       ),
                     ],
                   ),
-                ),
-              ] else ...[
+                );
+              },
+            ),
+          ] else ...[
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white60,
@@ -1238,16 +1390,114 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      subtitle: Text(
-                        m.text.isNotEmpty ? m.text : '[${m.type.name}]',
-                        style: const TextStyle(color: Colors.white70),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      subtitle: Builder(
+                        builder: (context) {
+                          final platform = session?.platform ?? Platform.whatsapp;
+                          final isMessengerOrInstagram = platform == Platform.messenger || platform == Platform.instagram;
+                          return Row(
+                            children: [
+                              if (isMessengerOrInstagram) ...[
+                                if (m.type == MessageType.image || m.type == MessageType.video || m.type == MessageType.audio) ...[
+                                  const Icon(Icons.attachment_rounded, size: 12, color: Colors.white54),
+                                  const SizedBox(width: 4),
+                                ],
+                              ] else ...[
+                                if (m.type == MessageType.image) ...[
+                                  const Icon(Icons.camera_alt_rounded, size: 12, color: Colors.white54),
+                                  const SizedBox(width: 4),
+                                ] else if (m.type == MessageType.video) ...[
+                                  const Icon(Icons.videocam_rounded, size: 12, color: Colors.white54),
+                                  const SizedBox(width: 4),
+                                ] else if (m.type == MessageType.audio) ...[
+                                  Icon(m.isVoiceNote ? Icons.mic_rounded : Icons.audiotrack_rounded, size: 12, color: Colors.white54),
+                                  const SizedBox(width: 4),
+                                ],
+                              ],
+                              Expanded(
+                                child: Text(
+                                  _getMediaReplyLabelText(m, isMessengerOrInstagram),
+                                  style: const TextStyle(color: Colors.white70),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
                       ),
+                      trailing: (m.type == MessageType.image || m.type == MessageType.video)
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Builder(
+                                builder: (context) {
+                                  Widget imgWidget;
+                                  if (m.imageBytes != null) {
+                                    imgWidget = Image.memory(
+                                      m.imageBytes!,
+                                      width: 32,
+                                      height: 32,
+                                      fit: BoxFit.cover,
+                                    );
+                                  } else {
+                                    final placeholderUrl = m.type == MessageType.image
+                                        ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop'
+                                        : 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=100&h=100&fit=crop';
+                                    imgWidget = Image.network(
+                                      placeholderUrl,
+                                      width: 32,
+                                      height: 32,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        width: 32,
+                                        height: 32,
+                                        color: Colors.white12,
+                                        child: Icon(
+                                          m.type == MessageType.image
+                                              ? Icons.image_rounded
+                                              : Icons.videocam_rounded,
+                                          size: 14,
+                                          color: Colors.white38,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  if (m.type == MessageType.video) {
+                                    return SizedBox(
+                                      width: 32,
+                                      height: 32,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          Positioned.fill(child: imgWidget),
+                                          Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: const BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.black38,
+                                            ),
+                                            child: const Icon(
+                                              Icons.play_arrow_rounded,
+                                              size: 10,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    return imgWidget;
+                                  }
+                                }
+                              ),
+                            )
+                          : null,
                       onTap: () {
+                        final platform = session?.platform ?? Platform.whatsapp;
+                        final isMessengerOrInstagram = platform == Platform.messenger || platform == Platform.instagram;
                         setState(() {
                           _repliedToId = m.id;
-                          _repliedToText = m.text.isNotEmpty ? m.text : '[${m.type.name}]';
+                          _repliedToText = _getMediaReplyLabelText(m, isMessengerOrInstagram);
                           _repliedToSenderName = senderName;
                         });
                         Navigator.pop(dialogCtx);
