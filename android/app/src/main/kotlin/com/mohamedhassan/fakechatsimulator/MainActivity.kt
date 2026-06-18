@@ -1,4 +1,4 @@
-package com.example.fake_chat_simulator
+package com.mohamedhassan.fakechatsimulator
 
 import io.flutter.embedding.android.FlutterActivity
 

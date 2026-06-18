@@ -35,4 +35,21 @@ class ScreenshotHelper {
         '${now.minute.toString().padLeft(2, '0')}'
         '${now.second.toString().padLeft(2, '0')}.png';
   }
+
+  static Future<bool> startScreenRecord() async {
+    try {
+      return await impl.startScreenRecord();
+    } catch (e) {
+      debugPrint('Start record error: $e');
+      return false;
+    }
+  }
+
+  static void stopScreenRecord() {
+    try {
+      impl.stopScreenRecord();
+    } catch (e) {
+      debugPrint('Stop record error: $e');
+    }
+  }
 }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 enum Platform { whatsapp, messenger, instagram, snapchat }
 
-enum MessageType { text, image, audio, voiceCall, videoCall, dateDivider }
+enum MessageType { text, image, audio, voiceCall, videoCall, dateDivider, video }
 
 enum MessageStatus { sending, sent, delivered, read }
 
@@ -118,6 +118,13 @@ class ChatMessage {
   String? repliedToId;
   String? repliedToText;
   String? repliedToSenderName;
+  bool isVoiceNote;
+  bool isVideoMessage;
+  String? fileName;
+  String? fileSize;
+  Uint8List? videoBytes;
+  Uint8List? audioBytes;
+  bool isForwarded;
 
   ChatMessage({
     required this.id,
@@ -133,6 +140,13 @@ class ChatMessage {
     this.repliedToId,
     this.repliedToText,
     this.repliedToSenderName,
+    this.isVoiceNote = false,
+    this.isVideoMessage = false,
+    this.fileName,
+    this.fileSize,
+    this.videoBytes,
+    this.audioBytes,
+    this.isForwarded = false,
   });
 
   ChatMessage copyWith({
@@ -150,6 +164,15 @@ class ChatMessage {
     String? repliedToText,
     String? repliedToSenderName,
     bool clearRepliedTo = false,
+    bool? isVoiceNote,
+    bool? isVideoMessage,
+    String? fileName,
+    String? fileSize,
+    Uint8List? videoBytes,
+    bool clearVideoBytes = false,
+    Uint8List? audioBytes,
+    bool clearAudioBytes = false,
+    bool? isForwarded,
   }) {
     return ChatMessage(
       id: id,
@@ -165,6 +188,13 @@ class ChatMessage {
       repliedToId: clearRepliedTo ? null : (repliedToId ?? this.repliedToId),
       repliedToText: clearRepliedTo ? null : (repliedToText ?? this.repliedToText),
       repliedToSenderName: clearRepliedTo ? null : (repliedToSenderName ?? this.repliedToSenderName),
+      isVoiceNote: isVoiceNote ?? this.isVoiceNote,
+      isVideoMessage: isVideoMessage ?? this.isVideoMessage,
+      fileName: fileName ?? this.fileName,
+      fileSize: fileSize ?? this.fileSize,
+      videoBytes: clearVideoBytes ? null : (videoBytes ?? this.videoBytes),
+      audioBytes: clearAudioBytes ? null : (audioBytes ?? this.audioBytes),
+      isForwarded: isForwarded ?? this.isForwarded,
     );
   }
 
@@ -183,6 +213,13 @@ class ChatMessage {
       'repliedToId': repliedToId,
       'repliedToText': repliedToText,
       'repliedToSenderName': repliedToSenderName,
+      'isVoiceNote': isVoiceNote,
+      'isVideoMessage': isVideoMessage,
+      'fileName': fileName,
+      'fileSize': fileSize,
+      'videoBytes': videoBytes,
+      'audioBytes': audioBytes,
+      'isForwarded': isForwarded,
     };
   }
 
@@ -205,6 +242,13 @@ class ChatMessage {
       repliedToId: map['repliedToId'] as String?,
       repliedToText: map['repliedToText'] as String?,
       repliedToSenderName: map['repliedToSenderName'] as String?,
+      isVoiceNote: map['isVoiceNote'] as bool? ?? false,
+      isVideoMessage: map['isVideoMessage'] as bool? ?? false,
+      fileName: map['fileName'] as String?,
+      fileSize: map['fileSize'] as String?,
+      videoBytes: _parseBytes(map['videoBytes']),
+      audioBytes: _parseBytes(map['audioBytes']),
+      isForwarded: map['isForwarded'] as bool? ?? false,
     );
   }
 

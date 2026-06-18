@@ -89,11 +89,14 @@ class _WhatsAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = Provider.of<ChatProvider>(context);
     final String statusText = (session.isBlocked || session.isBlockedMe)
         ? ''
-        : (session.contactUser.onlineStatus == UserOnlineStatus.typing
-            ? 'typing...'
-            : session.contactUser.statusText);
+        : (chatProvider.isPlayingConversation
+            ? (chatProvider.simulatedContactStatus ?? 'online')
+            : (session.contactUser.onlineStatus == UserOnlineStatus.typing
+                ? 'typing...'
+                : session.contactUser.statusText));
 
     return Container(
       height: 58,
@@ -221,6 +224,7 @@ class _MessengerBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = Provider.of<ChatProvider>(context);
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -278,9 +282,11 @@ class _MessengerBar extends StatelessWidget {
                 if (!session.isBlocked && !session.isBlockedMe) ...[
                   const SizedBox(height: 1),
                   Text(
-                    session.contactUser.onlineStatus == UserOnlineStatus.typing
-                        ? 'typing...'
-                        : session.contactUser.statusText,
+                    chatProvider.isPlayingConversation
+                        ? (chatProvider.simulatedContactStatus ?? 'Active now')
+                        : (session.contactUser.onlineStatus == UserOnlineStatus.typing
+                            ? 'typing...'
+                            : session.contactUser.statusText),
                     style: const TextStyle(
                       color: Color(0xFF65676B),
                       fontSize: 11.5,
@@ -356,6 +362,7 @@ class _InstagramBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = Provider.of<ChatProvider>(context);
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -411,9 +418,11 @@ class _InstagramBar extends StatelessWidget {
                 if (!session.isBlocked && !session.isBlockedMe) ...[
                   const SizedBox(height: 1),
                   Text(
-                    session.contactUser.onlineStatus == UserOnlineStatus.typing
-                        ? 'typing...'
-                        : session.contactUser.statusText,
+                    chatProvider.isPlayingConversation
+                        ? (chatProvider.simulatedContactStatus ?? 'Active now')
+                        : (session.contactUser.onlineStatus == UserOnlineStatus.typing
+                            ? 'typing...'
+                            : session.contactUser.statusText),
                     style: const TextStyle(
                       color: Color(0xFF999999),
                       fontSize: 11,
@@ -489,6 +498,7 @@ class _SnapchatBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = Provider.of<ChatProvider>(context);
     return Container(
       height: 56,
       decoration: const BoxDecoration(
@@ -523,7 +533,30 @@ class _SnapchatBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (!session.isBlocked && !session.isBlockedMe) ...[
-                  if (session.contactUser.onlineStatus == UserOnlineStatus.online ||
+                  if (chatProvider.isPlayingConversation) ...[
+                    const SizedBox(height: 1),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF00FF00),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          chatProvider.simulatedContactStatus ?? 'Active now',
+                          style: const TextStyle(
+                            color: Color(0xFF666666),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (session.contactUser.onlineStatus == UserOnlineStatus.online ||
                       session.contactUser.onlineStatus == UserOnlineStatus.typing) ...[
                     const SizedBox(height: 1),
                     Row(

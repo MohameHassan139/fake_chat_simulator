@@ -1,4 +1,6 @@
+import 'dart:io' as io;
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +10,7 @@ import '../providers/chat_provider.dart';
 import '../providers/theme_provider.dart';
 import '../themes/platform_themes.dart';
 import '../utils/language_helper.dart';
+import 'editor_panel.dart';
 
 const _uuid = Uuid();
 
@@ -30,16 +33,23 @@ class MessageEditorSheet extends StatefulWidget {
 class _MessageEditorSheetState extends State<MessageEditorSheet> {
   late TextEditingController _textController;
   late TextEditingController _reactionController;
+  late TextEditingController _fileNameController;
+  late TextEditingController _fileSizeController;
   late bool _isSender;
   late MessageStatus _status;
   late DateTime _timestamp;
   late MessageType _type;
+  late bool _isVoiceNote;
+  late bool _isVideoMessage;
+  late bool _isForwarded;
 
   int _minutes = 0;
   int _seconds = 30;
   String _callStatus = 'Answered';
   String? _selectedReaction;
   Uint8List? _imageBytes;
+  Uint8List? _videoBytes;
+  Uint8List? _audioBytes;
 
   String? _repliedToId;
   String? _repliedToText;
@@ -53,12 +63,19 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
     _textController = TextEditingController(text: msg?.text ?? '');
     _reactionController = TextEditingController(text: msg?.reaction ?? '');
+    _fileNameController = TextEditingController(text: msg?.fileName ?? '');
+    _fileSizeController = TextEditingController(text: msg?.fileSize ?? '');
     _isSender = msg?.isSender ?? chatProvider.isSenderMode;
     _status = msg?.status ?? MessageStatus.read;
     _timestamp = msg?.timestamp ?? DateTime.now();
     _type = msg?.type ?? widget.defaultType ?? MessageType.text;
     _selectedReaction = msg?.reaction;
     _imageBytes = msg?.imageBytes;
+    _videoBytes = msg?.videoBytes;
+    _audioBytes = msg?.audioBytes;
+    _isVoiceNote = msg?.isVoiceNote ?? false;
+    _isVideoMessage = msg?.isVideoMessage ?? false;
+    _isForwarded = msg?.isForwarded ?? false;
 
     _repliedToId = msg?.repliedToId;
     _repliedToText = msg?.repliedToText;
@@ -74,7 +91,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
           : (chatProvider.activeSession?.contactUser.name ?? 'Contact');
     }
 
-    // Load duration details if call or audio
+    // Load duration details if call or audio or video
     if (msg?.audioDuration != null) {
       _minutes = msg!.audioDuration!.inMinutes;
       _seconds = msg.audioDuration!.inSeconds % 60;
@@ -93,6 +110,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
   void dispose() {
     _textController.dispose();
     _reactionController.dispose();
+    _fileNameController.dispose();
+    _fileSizeController.dispose();
     super.dispose();
   }
 
@@ -103,6 +122,57 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
       final bytes = await file.readAsBytes();
       setState(() => _imageBytes = bytes);
     }
+  }
+
+  Future<void> _pickVideo() async {
+    final picker = ImagePicker();
+    final file = await picker.pickVideo(source: ImageSource.gallery);
+    if (file != null) {
+      final bytes = await file.readAsBytes();
+      setState(() => _videoBytes = bytes);
+    }
+  }
+
+  Future<void> _pickAudioFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
+        withData: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        Uint8List? bytes = file.bytes;
+        if (bytes == null && file.path != null) {
+          bytes = await io.File(file.path!).readAsBytes();
+        }
+        if (bytes != null) {
+          setState(() {
+            _audioBytes = bytes;
+            _fileNameController.text = file.name;
+            final mb = bytes!.length / (1024 * 1024);
+            _fileSizeController.text = '${mb.toStringAsFixed(1)} MB';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking audio file: $e');
+    }
+  }
+
+  void _recordVoiceNote() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => VoiceRecorderDialog(
+        onConfirm: (duration, audioBytes) {
+          setState(() {
+            _audioBytes = audioBytes;
+            _minutes = duration.inMinutes;
+            _seconds = duration.inSeconds % 60;
+          });
+        },
+      ),
+    );
   }
 
   void _save() {
@@ -122,7 +192,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
       return;
     }
 
-    final Duration? finalDuration = (_type == MessageType.audio || _type == MessageType.voiceCall || _type == MessageType.videoCall)
+    final Duration? finalDuration = (_type == MessageType.audio || _type == MessageType.video || _type == MessageType.voiceCall || _type == MessageType.videoCall)
         ? Duration(minutes: _minutes, seconds: _seconds)
         : null;
 
@@ -147,6 +217,14 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
           repliedToText: _repliedToText,
           repliedToSenderName: _repliedToSenderName,
           clearRepliedTo: _repliedToId == null,
+          isVoiceNote: _isVoiceNote,
+          isVideoMessage: _isVideoMessage,
+          fileName: _fileNameController.text.trim().isEmpty ? null : _fileNameController.text.trim(),
+          fileSize: _fileSizeController.text.trim().isEmpty ? null : _fileSizeController.text.trim(),
+          videoBytes: _videoBytes,
+          isForwarded: _isForwarded,
+          audioBytes: _audioBytes,
+          clearAudioBytes: _audioBytes == null,
         ),
       );
     } else {
@@ -163,6 +241,13 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
         repliedToId: _repliedToId,
         repliedToText: _repliedToText,
         repliedToSenderName: _repliedToSenderName,
+        isVoiceNote: _isVoiceNote,
+        isVideoMessage: _isVideoMessage,
+        fileName: _fileNameController.text.trim().isEmpty ? null : _fileNameController.text.trim(),
+        fileSize: _fileSizeController.text.trim().isEmpty ? null : _fileSizeController.text.trim(),
+        videoBytes: _videoBytes,
+        isForwarded: _isForwarded,
+        audioBytes: _audioBytes,
       );
       chatProvider.addMessage(newMessage);
     }
@@ -174,6 +259,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
       case MessageType.text: return 'Text Message';
       case MessageType.image: return 'Image Message';
       case MessageType.audio: return 'Audio Message';
+      case MessageType.video: return 'Video Message';
       case MessageType.voiceCall: return 'Voice Call Record';
       case MessageType.videoCall: return 'Video Call Record';
       case MessageType.dateDivider: return 'Date Separator';
@@ -255,6 +341,221 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             ),
             const SizedBox(height: 16),
 
+            // Presentation Formats (Voice Note vs Audio File, Circular Video vs Standard Video)
+            if (_type == MessageType.audio) ...[
+              _SLabel('Audio Style'),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF242424),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<bool>(
+                    value: _isVoiceNote,
+                    dropdownColor: const Color(0xFF1E1E1E),
+                    isExpanded: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    items: const [
+                      DropdownMenuItem(value: true, child: Text('Voice Note (Recorded layout)')),
+                      DropdownMenuItem(value: false, child: Text('Audio File (Picked layout)')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() {
+                          _isVoiceNote = v;
+                          _audioBytes = null;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_isVoiceNote) ...[
+                _SLabel('Voice Recording'),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _recordVoiceNote,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF242424),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _audioBytes != null ? const Color(0xFF00A884) : Colors.white12,
+                        width: _audioBytes != null ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _audioBytes != null ? Icons.check_circle_rounded : Icons.mic_none_rounded,
+                            color: _audioBytes != null ? const Color(0xFF00A884) : Colors.white38,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _audioBytes != null
+                                ? 'Voice Note Recorded (${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')})'
+                                : 'Tap to Record Voice Note',
+                            style: TextStyle(
+                              color: _audioBytes != null ? Colors.white : Colors.white38,
+                              fontSize: 13,
+                            ),
+                          ),
+                          if (_audioBytes != null) ...[
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _audioBytes = null;
+                                  _minutes = 0;
+                                  _seconds = 0;
+                                });
+                              },
+                              child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                _SLabel('Audio File Upload'),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _pickAudioFile,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF242424),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _audioBytes != null ? const Color(0xFF6C63FF) : Colors.white12,
+                        width: _audioBytes != null ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _audioBytes != null ? Icons.audiotrack_rounded : Icons.library_music_rounded,
+                            color: _audioBytes != null ? const Color(0xFF6C63FF) : Colors.white38,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _audioBytes != null
+                                  ? 'Audio: ${_fileNameController.text} (${_fileSizeController.text})'
+                                  : 'Tap to Pick Audio File',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _audioBytes != null ? Colors.white : Colors.white38,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          if (_audioBytes != null) ...[
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _audioBytes = null;
+                                  _fileNameController.clear();
+                                  _fileSizeController.clear();
+                                });
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _SLabel('Audio File Name'),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _fileNameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(hintText: 'e.g. AUD-20260614-WA0001.mp3'),
+                ),
+                const SizedBox(height: 16),
+                _SLabel('Audio File Size'),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _fileSizeController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(hintText: 'e.g. 1.2 MB'),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ],
+
+            if (_type == MessageType.video) ...[
+              _SLabel('Video Style'),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF242424),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<bool>(
+                    value: _isVideoMessage,
+                    dropdownColor: const Color(0xFF1E1E1E),
+                    isExpanded: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    items: const [
+                      DropdownMenuItem(value: true, child: Text('Instant Video Note (Circular)')),
+                      DropdownMenuItem(value: false, child: Text('Standard Video Attachment (Rectangular)')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() {
+                          _isVideoMessage = v;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (!_isVideoMessage) ...[
+                _SLabel('Video File Name'),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _fileNameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(hintText: 'e.g. VID-20260614-WA0001.mp4'),
+                ),
+                const SizedBox(height: 16),
+                _SLabel('Video File Size'),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _fileSizeController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(hintText: 'e.g. 4.2 MB'),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ],
+
             // Quoted Reply Section (Hidden for dateDividers)
             if (_type != MessageType.dateDivider) ...[
               _SLabel('Quoted Reply'),
@@ -332,6 +633,125 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Text Input Box (Hidden for calls, shown for text/image/dateDividers)
             if (_type != MessageType.voiceCall && _type != MessageType.videoCall) ...[
+              // Video picker (only for video type)
+              if (_type == MessageType.video) ...[
+                _SLabel('Video Cover Frame / Thumbnail'),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: double.infinity,
+                    height: _imageBytes != null ? 180 : 100,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF242424),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _imageBytes != null ? const Color(0xFF6C63FF) : Colors.white12,
+                        width: _imageBytes != null ? 1.5 : 1,
+                      ),
+                    ),
+                    child: _imageBytes != null
+                        ? Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(11),
+                                child: Image.memory(
+                                  _imageBytes!,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _imageBytes = null),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Icon(Icons.close_rounded, size: 16, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: _pickImage,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.swap_horiz_rounded, size: 14, color: Colors.white),
+                                        SizedBox(width: 4),
+                                        Text('Change Cover Frame', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_photo_alternate_outlined, size: 32, color: Colors.white38),
+                              SizedBox(height: 8),
+                              Text('Tap to pick video cover frame / image', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _SLabel('Video File (Optional)'),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _pickVideo,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF242424),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _videoBytes != null ? const Color(0xFF6C63FF) : Colors.white12,
+                        width: _videoBytes != null ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _videoBytes != null ? Icons.video_file_rounded : Icons.video_library_rounded,
+                            color: _videoBytes != null ? const Color(0xFF6C63FF) : Colors.white38,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _videoBytes != null
+                                ? 'Change Video File (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)'
+                                : 'Pick Video File',
+                            style: TextStyle(
+                              color: _videoBytes != null ? const Color(0xFF6C63FF) : Colors.white38,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               // Image picker (only for image type)
               if (_type == MessageType.image) ...[
                 _SLabel('Image'),
@@ -490,8 +910,9 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
               const SizedBox(height: 16),
             ],
 
-            // Call / Audio Duration Picker (Only when audio OR call status is Answered)
+            // Call / Audio / Video Duration Picker (Only when audio OR video OR call status is Answered)
             if (_type == MessageType.audio || 
+                _type == MessageType.video ||
                 ((_type == MessageType.voiceCall || _type == MessageType.videoCall) && _callStatus == 'Answered')) ...[
               _SLabel('Call / Audio Duration'),
               const SizedBox(height: 8),
@@ -599,6 +1020,23 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                       color: const Color(0xFF42A5F5),
                       onTap: () => setState(() => _isSender = false),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Forwarded Message Toggle
+            if (_type != MessageType.dateDivider) ...[
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Forwarded Message', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  ),
+                  Switch(
+                    value: _isForwarded,
+                    activeColor: accentColor,
+                    onChanged: (v) => setState(() => _isForwarded = v),
                   ),
                 ],
               ),

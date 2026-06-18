@@ -12,10 +12,24 @@ class ChatProvider extends ChangeNotifier {
   bool _isSenderMode = true; // true = composing as "me" (right side)
   bool _viewChatList = false;
 
+  // Simulated playback states for screen recording presentation mode
+  bool _isPlayingConversation = false;
+  List<ChatMessage>? _simulatedMessages;
+  String? _simulatedTypingText;
+  String? _simulatedContactStatus;
+  bool _showSimulatedTypingIndicator = false;
+  bool _shouldStopPlayback = false;
+
   List<ChatSession> get sessions => List.unmodifiable(_sessions);
   ChatSession? get activeSession => _activeSession;
   bool get isSenderMode => _isSenderMode;
   bool get viewChatList => _viewChatList;
+
+  bool get isPlayingConversation => _isPlayingConversation;
+  List<ChatMessage> get activeMessages => _simulatedMessages ?? _activeSession?.messages ?? [];
+  String? get simulatedTypingText => _simulatedTypingText;
+  String? get simulatedContactStatus => _simulatedContactStatus;
+  bool get showSimulatedTypingIndicator => _showSimulatedTypingIndicator;
 
   ChatProvider() {
     _loadFromDatabase();
@@ -207,6 +221,10 @@ class ChatProvider extends ChangeNotifier {
     required bool isSender,
     required DateTime timestamp,
     MessageStatus status = MessageStatus.read,
+    bool isVoiceNote = false,
+    String? fileName,
+    String? fileSize,
+    Uint8List? audioBytes,
   }) {
     if (_activeSession == null) return;
     final msg = ChatMessage(
@@ -217,6 +235,39 @@ class ChatProvider extends ChangeNotifier {
       timestamp: timestamp,
       status: status,
       audioDuration: duration,
+      isVoiceNote: isVoiceNote,
+      fileName: fileName,
+      fileSize: fileSize,
+      audioBytes: audioBytes,
+    );
+    _activeSession!.messages.add(msg);
+    _saveSession(_activeSession!);
+    notifyListeners();
+  }
+
+  void addVideoMessage({
+    required Uint8List? videoBytes,
+    required bool isVideoMessage,
+    required Duration duration,
+    required bool isSender,
+    required DateTime timestamp,
+    MessageStatus status = MessageStatus.read,
+    String? fileName,
+    String? fileSize,
+  }) {
+    if (_activeSession == null) return;
+    final msg = ChatMessage(
+      id: _uuid.v4(),
+      text: '',
+      type: MessageType.video,
+      isSender: isSender,
+      timestamp: timestamp,
+      status: status,
+      audioDuration: duration,
+      isVideoMessage: isVideoMessage,
+      fileName: fileName,
+      fileSize: fileSize,
+      videoBytes: videoBytes,
     );
     _activeSession!.messages.add(msg);
     _saveSession(_activeSession!);
@@ -374,5 +425,117 @@ class ChatProvider extends ChangeNotifier {
 
   List<ChatMessage> _sampleMessages(Platform p) {
     return [];
+  }
+
+  // ─── Automated Playback Simulator ──────────────────────────────────────────
+
+  Future<void> startConversationPlayback(VoidCallback onDone) async {
+    if (_activeSession == null || _isPlayingConversation) return;
+    _isPlayingConversation = true;
+    _shouldStopPlayback = false;
+    _simulatedMessages = [];
+    _simulatedTypingText = null;
+    _simulatedContactStatus = null;
+    _showSimulatedTypingIndicator = false;
+    notifyListeners();
+
+    // Copy original messages
+    final originalMessages = List<ChatMessage>.from(_activeSession!.messages);
+
+    for (final msg in originalMessages) {
+      if (_shouldStopPlayback) break;
+
+      // Skip date dividers during animated typing simulation
+      if (msg.type == MessageType.dateDivider) {
+        _simulatedMessages!.add(msg);
+        notifyListeners();
+        continue;
+      }
+
+      // Typing speed based on message length
+      final typingDelayMs = msg.text.isNotEmpty 
+          ? (msg.text.length * 50).clamp(800, 2500)
+          : 1200;
+
+      if (!msg.isSender) {
+        // RECEIVER: Shows typing indicator and adds message
+        _simulatedContactStatus = 'typing...';
+        _showSimulatedTypingIndicator = true;
+        notifyListeners();
+
+        await Future.delayed(Duration(milliseconds: typingDelayMs));
+        if (_shouldStopPlayback) break;
+
+        _simulatedContactStatus = 'online';
+        _showSimulatedTypingIndicator = false;
+        _simulatedMessages!.add(msg);
+        notifyListeners();
+
+      } else {
+        // SENDER: Animates character typing, then displays bubble with status ticks
+        final fullText = msg.text.isNotEmpty ? msg.text : 'Attachment';
+        _simulatedTypingText = '';
+        notifyListeners();
+
+        for (int i = 0; i < fullText.length; i++) {
+          if (_shouldStopPlayback) break;
+          await Future.delayed(const Duration(milliseconds: 50));
+          _simulatedTypingText = fullText.substring(0, i + 1);
+          notifyListeners();
+        }
+
+        if (_shouldStopPlayback) break;
+        await Future.delayed(const Duration(milliseconds: 200));
+
+        _simulatedTypingText = null;
+        final sendingMsg = msg.copyWith(status: MessageStatus.sending);
+        _simulatedMessages!.add(sendingMsg);
+        notifyListeners();
+
+        // Tick Progression
+        await Future.delayed(const Duration(milliseconds: 400));
+        if (_shouldStopPlayback) break;
+        _updateSimulatedMessageStatus(msg.id, MessageStatus.sent);
+
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (_shouldStopPlayback) break;
+        _updateSimulatedMessageStatus(msg.id, MessageStatus.delivered);
+
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (_shouldStopPlayback) break;
+        _updateSimulatedMessageStatus(msg.id, MessageStatus.read);
+      }
+
+      // Read interval
+      await Future.delayed(const Duration(milliseconds: 1200));
+    }
+
+    _isPlayingConversation = false;
+    _simulatedMessages = null;
+    _simulatedTypingText = null;
+    _simulatedContactStatus = null;
+    _showSimulatedTypingIndicator = false;
+    notifyListeners();
+    onDone();
+  }
+
+  void _updateSimulatedMessageStatus(String id, MessageStatus status) {
+    final list = _simulatedMessages;
+    if (list == null) return;
+    final idx = list.indexWhere((m) => m.id == id);
+    if (idx >= 0) {
+      list[idx] = list[idx].copyWith(status: status);
+      notifyListeners();
+    }
+  }
+
+  void stopConversationPlayback() {
+    _shouldStopPlayback = true;
+    _isPlayingConversation = false;
+    _simulatedMessages = null;
+    _simulatedTypingText = null;
+    _simulatedContactStatus = null;
+    _showSimulatedTypingIndicator = false;
+    notifyListeners();
   }
 }

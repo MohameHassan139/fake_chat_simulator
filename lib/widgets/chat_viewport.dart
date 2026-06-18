@@ -59,16 +59,22 @@ class ChatViewport extends StatelessWidget {
   }
 
   Widget _buildChatArea(BuildContext context) {
-    final messages = session.messages;
+    final chatProvider = Provider.of<ChatProvider>(context);
+    final messages = chatProvider.activeMessages;
     final bool isAr = context.read<ThemeProvider>().isArabic;
 
     return _buildBackground(
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-        itemCount: _countWithDateDividers(messages, isAr),
+      child: _AutoScrollingListView(
+        messages: messages,
+        isAr: isAr,
+        countWithDateDividers: _countWithDateDividers(messages, isAr),
         itemBuilder: (context, index) {
           return _buildListItem(context, index, messages, isAr);
         },
+        isPlaying: chatProvider.isPlayingConversation,
+        showTyping: chatProvider.showSimulatedTypingIndicator,
+        platformTheme: platformTheme,
+        session: session,
       ),
     );
   }
@@ -822,4 +828,210 @@ class WhatsAppWallpaperPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant WhatsAppWallpaperPainter oldDelegate) => false;
+}
+
+// ─── Auto-Scrolling List View for Playback Mode ──────────────────────────────
+
+class _AutoScrollingListView extends StatefulWidget {
+  final List<ChatMessage> messages;
+  final bool isAr;
+  final int countWithDateDividers;
+  final IndexedWidgetBuilder itemBuilder;
+  final bool isPlaying;
+  final bool showTyping;
+  final PlatformTheme platformTheme;
+  final ChatSession session;
+
+  const _AutoScrollingListView({
+    required this.messages,
+    required this.isAr,
+    required this.countWithDateDividers,
+    required this.itemBuilder,
+    required this.isPlaying,
+    required this.showTyping,
+    required this.platformTheme,
+    required this.session,
+  });
+
+  @override
+  State<_AutoScrollingListView> createState() => _AutoScrollingListViewState();
+}
+
+class _AutoScrollingListViewState extends State<_AutoScrollingListView> {
+  final ScrollController _scrollController = ScrollController();
+  int _lastMessageCount = 0;
+  bool _lastShowTyping = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastMessageCount = widget.messages.length;
+    _lastShowTyping = widget.showTyping;
+    if (widget.isPlaying) {
+      _scrollToBottom();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _AutoScrollingListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.messages.length != _lastMessageCount || widget.showTyping != _lastShowTyping) {
+      _lastMessageCount = widget.messages.length;
+      _lastShowTyping = widget.showTyping;
+      _scrollToBottom();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = widget.countWithDateDividers + (widget.showTyping ? 1 : 0);
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      itemCount: count,
+      itemBuilder: (context, index) {
+        if (widget.showTyping && index == count - 1) {
+          return _buildTypingIndicatorBubble(context);
+        }
+        return widget.itemBuilder(context, index);
+      },
+    );
+  }
+
+  Widget _buildTypingIndicatorBubble(BuildContext context) {
+    final bool isWhatsApp = widget.session.platform == Platform.whatsapp;
+    final Color bubbleBg = isWhatsApp 
+        ? (widget.session.isDarkMode ? const Color(0xFF1F2C34) : Colors.white)
+        : (widget.session.platform == Platform.messenger 
+            ? (widget.session.isDarkMode ? const Color(0xFF242526) : const Color(0xFFE4E6EB))
+            : (widget.session.platform == Platform.instagram 
+                ? (widget.session.isDarkMode ? const Color(0xFF262626) : const Color(0xFFEFEFEF))
+                : const Color(0xFFEAEAEA)));
+
+    final Color dotColor = isWhatsApp 
+        ? (widget.session.isDarkMode ? Colors.white60 : Colors.black45)
+        : Colors.grey;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (widget.platformTheme.showReceiverAvatar) ...[
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: Colors.grey.shade400,
+              backgroundImage: widget.session.contactUser.avatarBytes != null 
+                  ? MemoryImage(widget.session.contactUser.avatarBytes!) 
+                  : null,
+              child: widget.session.contactUser.avatarBytes == null 
+                  ? Text(widget.session.contactUser.name.substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12)) 
+                  : null,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: bubbleBg,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: const Radius.circular(4),
+                bottomRight: const Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) {
+                return _BouncingDot(delay: Duration(milliseconds: i * 200), color: dotColor);
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Bouncing Dot Animation for Typing Indicator ───────────────────────────
+
+class _BouncingDot extends StatefulWidget {
+  final Duration delay;
+  final Color color;
+  const _BouncingDot({required this.delay, required this.color});
+
+  @override
+  State<_BouncingDot> createState() => _BouncingDotState();
+}
+
+class _BouncingDotState extends State<_BouncingDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _animation = Tween<double>(begin: 0.0, end: -6.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    Future.delayed(widget.delay, () {
+      if (mounted) {
+        _controller.repeat(reverse: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _animation.value),
+          child: child,
+        );
+      },
+      child: Container(
+        width: 6,
+        height: 6,
+        margin: const EdgeInsets.symmetric(horizontal: 2.5),
+        decoration: BoxDecoration(
+          color: widget.color,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
 }

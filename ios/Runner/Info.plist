@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires access to the microphone to record voice notes.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires access to the camera to record video notes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires access to the photo library to pick images and videos.</string>
 </dict>
 </plist>

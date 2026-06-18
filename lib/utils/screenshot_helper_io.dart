@@ -73,3 +73,6 @@ Future<Directory> _outputDir() async {
   if (!await dir.exists()) await dir.create(recursive: true);
   return dir;
 }
+
+Future<bool> startScreenRecord() async => false;
+void stopScreenRecord() {}

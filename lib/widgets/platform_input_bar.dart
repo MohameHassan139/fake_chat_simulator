@@ -75,6 +75,12 @@ class _WhatsAppInput extends StatelessWidget {
       child: const Icon(Icons.mic, color: Colors.white, size: 23),
     );
 
+    final chatProvider = context.watch<ChatProvider>();
+    final String currentText = chatProvider.simulatedTypingText ?? hintText;
+    final Color currentTextColor = chatProvider.simulatedTypingText != null
+        ? (theme.chatBg == const Color(0xFF0B141A) ? Colors.white : Colors.black87)
+        : iconColor;
+
     final inputField = Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -102,9 +108,9 @@ class _WhatsAppInput extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      hintText,
+                      currentText,
                       textAlign: TextAlign.right,
-                      style: TextStyle(color: iconColor, fontSize: 16),
+                      style: TextStyle(color: currentTextColor, fontSize: 16),
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -118,8 +124,8 @@ class _WhatsAppInput extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      hintText,
-                      style: TextStyle(color: iconColor, fontSize: 16),
+                      currentText,
+                      style: TextStyle(color: currentTextColor, fontSize: 16),
                     ),
                   ),
                   Transform.rotate(
@@ -160,6 +166,12 @@ class _MessengerInput extends StatelessWidget {
     final borderColor =
         isDark ? const Color(0xFF3A3B3C) : const Color(0xFFECECEC);
 
+    final chatProvider = context.watch<ChatProvider>();
+    final String currentText = chatProvider.simulatedTypingText ?? 'Aa';
+    final Color currentTextColor = chatProvider.simulatedTypingText != null
+        ? (isDark ? Colors.white : Colors.black87)
+        : (isDark ? Colors.white38 : const Color(0xFF8E8E93));
+
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
       decoration: BoxDecoration(
@@ -186,11 +198,10 @@ class _MessengerInput extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Aa',
+                      currentText,
                       textAlign: TextAlign.right,
                       style: TextStyle(
-                        color:
-                            isDark ? Colors.white38 : const Color(0xFF8E8E93),
+                        color: currentTextColor,
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                       ),
@@ -270,10 +281,9 @@ class _MessengerInput extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Aa',
+                      currentText,
                       style: TextStyle(
-                        color:
-                            isDark ? Colors.white38 : const Color(0xFF8E8E93),
+                        color: currentTextColor,
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                       ),
@@ -328,6 +338,12 @@ class _InstagramInput extends StatelessWidget {
       ),
     );
 
+    final chatProvider = context.watch<ChatProvider>();
+    final String currentText = chatProvider.simulatedTypingText ?? hintText;
+    final Color currentTextColor = chatProvider.simulatedTypingText != null
+        ? (isDark ? Colors.white : Colors.black87)
+        : (isDark ? Colors.white38 : const Color(0xFF999999));
+
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 14),
       decoration: BoxDecoration(
@@ -356,12 +372,10 @@ class _InstagramInput extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            hintText,
+                            currentText,
                             textAlign: TextAlign.right,
                             style: TextStyle(
-                              color: isDark
-                                  ? Colors.white38
-                                  : const Color(0xFF999999),
+                              color: currentTextColor,
                               fontSize: 14.5,
                             ),
                           ),
@@ -394,11 +408,9 @@ class _InstagramInput extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            hintText,
+                            currentText,
                             style: TextStyle(
-                              color: isDark
-                                  ? Colors.white38
-                                  : const Color(0xFF999999),
+                              color: currentTextColor,
                               fontSize: 14.5,
                             ),
                           ),
@@ -437,6 +449,12 @@ class _SnapchatInput extends StatelessWidget {
     final textColor = isDark ? Colors.white54 : const Color(0xFF656667);
     final hintText = isArabic ? 'أرسل رسالة' : 'Send a chat';
     final iconBorderColor = isDark ? Colors.white54 : Colors.black87;
+
+    final chatProvider = context.watch<ChatProvider>();
+    final String currentText = chatProvider.simulatedTypingText ?? hintText;
+    final Color currentTextColor = chatProvider.simulatedTypingText != null
+        ? (isDark ? Colors.white : Colors.black87)
+        : textColor;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 14),
@@ -478,10 +496,10 @@ class _SnapchatInput extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            hintText,
+                            currentText,
                             textAlign: TextAlign.right,
                             style: TextStyle(
-                              color: textColor,
+                              color: currentTextColor,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -521,9 +539,9 @@ class _SnapchatInput extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            hintText,
+                            currentText,
                             style: TextStyle(
-                              color: textColor,
+                              color: currentTextColor,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),

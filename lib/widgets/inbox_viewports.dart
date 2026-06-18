@@ -184,23 +184,10 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
     // Default mock data to populate list
     final List<Map<String, dynamic>> mockChats = [
       {
-        'name': 'Orange Egypt',
-        'message': isAr
-            ? 'نظيرًا لعدم وجود تفاعل، سيتم الآن إنهاء المحادثة. لا تتردد ف..'
-            : 'Due to lack of interaction, the conversation will be ended now. Don\'t hesitate to...',
-        'time': '12:55 ص',
-        'unread': 0,
-        'online': false,
-        'typing': false,
-        'isDisappearing': false,
-        'lastMsgStatus': MessageStatus.read,
-        'isLastSenderMe': false,
-      },
-      {
-        'name': 'محمد ناجي',
-        'message': isAr ? 'تفاعلت بالرمز 😂 على "😂"' : 'Reacted 😂 to "😂"',
-        'time': isAr ? 'أمس' : 'Yesterday',
-        'unread': 0,
+        'name': 'Sarah ☕',
+        'message': isAr ? 'هل ما زلنا على موعد الغداء؟' : 'Are we still on for lunch?',
+        'time': '10:42 AM',
+        'unread': 2,
         'online': true,
         'typing': false,
         'isDisappearing': false,
@@ -208,8 +195,8 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
         'isLastSenderMe': false,
       },
       {
-        'name': 'معتز',
-        'message': '😂',
+        'name': 'Family Group 🏡',
+        'message': isAr ? 'أبي: انظر إلى هذه الصورة!' : 'Dad: Check out this photo!',
         'time': isAr ? 'أمس' : 'Yesterday',
         'unread': 0,
         'online': false,
@@ -219,74 +206,26 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
         'isLastSenderMe': false,
       },
       {
-        'name': 'Khaled Nageh',
-        'message': 'https://www.instagram.com/reel/DZA77GI...',
-        'time': isAr ? 'أمس' : 'Yesterday',
+        'name': 'Elon Musk 🚀',
+        'message': isAr ? 'المريخ يبدو رائعًا اليوم.' : 'Mars is looking great today.',
+        'time': isAr ? 'الأربعاء' : 'Wednesday',
         'unread': 0,
         'online': false,
         'typing': false,
         'isDisappearing': false,
         'lastMsgStatus': MessageStatus.read,
-        'isLastSenderMe': true,
+        'isLastSenderMe': false,
       },
       {
-        'name': 'حسن المصر',
-        'message': isAr
-            ? 'تم تحديث مؤقت الرسائل. ستختفي الرسائل الجديدة من هذا...'
-            : 'Message timer updated. New messages will disappear from this...',
-        'time': isAr ? 'أمس' : 'Yesterday',
+        'name': 'Dev Collaboration',
+        'message': isAr ? 'تمت مراجعة طلب السحب ودمجه بنجاح.' : 'PR reviewed and merged successfully.',
+        'time': '24/05/2026',
         'unread': 0,
         'online': false,
         'typing': false,
         'isDisappearing': true,
         'lastMsgStatus': MessageStatus.read,
-        'isLastSenderMe': false,
-      },
-      {
-        'name': '+20 11 01860176',
-        'message': isAr ? 'علي خير أن شاء الله' : 'On goodness, God willing',
-        'time': isAr ? 'أمس' : 'Yesterday',
-        'unread': 0,
-        'online': false,
-        'typing': false,
-        'isDisappearing': false,
-        'lastMsgStatus': MessageStatus.delivered,
         'isLastSenderMe': true,
-      },
-      {
-        'name': 'محمد عاطف',
-        'message': isAr
-            ? 'تفاعل محمد بالرمز ❤️ على "علي خير أن شاء الله"'
-            : 'Mohamed reacted ❤️ to "On goodness, God willing"',
-        'time': isAr ? 'أمس' : 'Yesterday',
-        'unread': 0,
-        'online': false,
-        'typing': false,
-        'isDisappearing': false,
-        'lastMsgStatus': MessageStatus.read,
-        'isLastSenderMe': false,
-      },
-      {
-        'name': 'الشحاتين برو ماكس',
-        'message': isAr ? 'أنت: لا' : 'You: No',
-        'time': '20/05/2026',
-        'unread': 0,
-        'online': false,
-        'typing': false,
-        'isDisappearing': false,
-        'lastMsgStatus': MessageStatus.read,
-        'isLastSenderMe': true,
-      },
-      {
-        'name': '7asobatyet Dalga',
-        'message': isAr ? 'مرحبا بك في المجموعة' : 'Welcome to the group',
-        'time': '12/05/2026',
-        'unread': 0,
-        'online': false,
-        'typing': false,
-        'isDisappearing': false,
-        'lastMsgStatus': MessageStatus.read,
-        'isLastSenderMe': false,
       }
     ];
 
@@ -2125,7 +2064,8 @@ class _SnapchatInbox extends StatelessWidget {
                   String snapStatus;
                   final isSnap = msg.toLowerCase().contains('snap') ||
                       (hasMessages &&
-                          s.messages.last.type == MessageType.image);
+                          (s.messages.last.type == MessageType.image ||
+                           s.messages.last.type == MessageType.video));
 
                   if (s.unreadCount > 0) {
                     snapStatus = isSnap

@@ -1,6 +1,13 @@
+import 'dart:async';
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:video_player/video_player.dart';
 import '../models/chat_models.dart';
+import '../utils/video_helper.dart';
+import '../utils/audio_helper.dart';
 import '../themes/platform_themes.dart';
 import '../providers/theme_provider.dart';
 
@@ -223,7 +230,16 @@ class MessageBubble extends StatelessWidget {
         );
         break;
       case MessageType.audio:
-        bubbleContent = _AudioContent(
+        bubbleContent = _AudioPlayerWidget(
+          message: message,
+          isSender: isSender,
+          platform: platform,
+          platformTheme: platformTheme,
+          isBlockedMe: isBlockedMe,
+        );
+        break;
+      case MessageType.video:
+        bubbleContent = _VideoPlayerWidget(
           message: message,
           isSender: isSender,
           platform: platform,
@@ -251,7 +267,7 @@ class MessageBubble extends StatelessWidget {
         );
     }
 
-    final finalContent = hasReply
+    var finalContent = hasReply
         ? IntrinsicWidth(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -270,6 +286,26 @@ class MessageBubble extends StatelessWidget {
             ),
           )
         : bubbleContent;
+
+    if (message.isForwarded) {
+      finalContent = IntrinsicWidth(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ForwardedHeader(
+              isSender: isSender,
+              platformTheme: platformTheme,
+            ),
+            finalContent,
+          ],
+        ),
+      );
+    }
+
+    if (message.type == MessageType.video && message.isVideoMessage) {
+      return finalContent;
+    }
 
     if (platform == Platform.whatsapp) {
       final clipper = WhatsAppBubbleClipper(
@@ -975,90 +1011,1067 @@ class _ImageContent extends StatelessWidget {
 
 // ─── Audio Content ────────────────────────────────────────────────────────────
 
-class _AudioContent extends StatelessWidget {
+// ─── Custom Progress Ring Painter ────────────────────────────────────────────
+
+class ProgressRingPainter extends CustomPainter {
+  final double progress; // 0.0 to 1.0
+  final Color color;
+
+  ProgressRingPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withOpacity(0.15)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - 3) / 2;
+
+    // Draw background track
+    canvas.drawCircle(center, radius, paint);
+
+    // Draw active arc
+    if (progress > 0) {
+      paint.color = color;
+      paint.strokeCap = StrokeCap.round;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -3.14159265 / 2, // start from top center
+        progress * 2 * 3.14159265, // sweep angle
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant ProgressRingPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.color != color;
+  }
+}
+
+// ─── Interactive Audio Player Widget ─────────────────────────────────────────
+
+class _AudioPlayerWidget extends StatefulWidget {
   final ChatMessage message;
   final bool isSender;
   final Platform platform;
   final PlatformTheme platformTheme;
   final bool isBlockedMe;
 
-  const _AudioContent({
+  const _AudioPlayerWidget({
     required this.message,
     required this.isSender,
     required this.platform,
     required this.platformTheme,
-    this.isBlockedMe = false,
+    required this.isBlockedMe,
   });
 
-  String _formatDuration(Duration? d) {
-    if (d == null) return '0:00';
-    final m = d.inMinutes.toString().padLeft(1, '0');
+  @override
+  State<_AudioPlayerWidget> createState() => _AudioPlayerWidgetState();
+}
+
+class _AudioPlayerWidgetState extends State<_AudioPlayerWidget> {
+  bool _isPlaying = false;
+  double _playbackSpeed = 1.0;
+  Duration _currentPosition = Duration.zero;
+  Duration _totalDuration = Duration.zero;
+
+  // Real audio player
+  AudioPlayer? _audioPlayer;
+  StreamSubscription? _posSub;
+  StreamSubscription? _durSub;
+  StreamSubscription? _stateSub;
+
+  String? _resolvedAudioPath;
+  bool _isInitializing = false;
+
+  // Timer for fallback/simulation
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _totalDuration = widget.message.audioDuration ?? const Duration(seconds: 30);
+    _resolveSource();
+  }
+
+  Future<void> _resolveSource() async {
+    if (widget.message.audioBytes != null) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = true;
+        });
+      }
+      final path = await AudioHelper.prepareAudioSource(widget.message.audioBytes!);
+      if (mounted) {
+        setState(() {
+          _resolvedAudioPath = path;
+          _isInitializing = false;
+        });
+        _initAudioPlayer();
+      }
+    }
+  }
+
+  void _initAudioPlayer() {
+    _audioPlayer = AudioPlayer();
+    _posSub = _audioPlayer!.onPositionChanged.listen((p) {
+      if (mounted) {
+        setState(() {
+          _currentPosition = p;
+        });
+      }
+    });
+    _durSub = _audioPlayer!.onDurationChanged.listen((d) {
+      if (mounted) {
+        setState(() {
+          _totalDuration = d;
+        });
+      }
+    });
+    _stateSub = _audioPlayer!.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _posSub?.cancel();
+    _durSub?.cancel();
+    _stateSub?.cancel();
+    _audioPlayer?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _togglePlay() async {
+    if (widget.message.audioBytes != null) {
+      if (_isInitializing) return;
+      if (_resolvedAudioPath == null) {
+        await _resolveSource();
+      }
+      if (_resolvedAudioPath == null) return;
+
+      if (_audioPlayer == null) {
+        _initAudioPlayer();
+      }
+      if (_isPlaying) {
+        await _audioPlayer!.pause();
+      } else {
+        await _audioPlayer!.setPlaybackRate(_playbackSpeed);
+        if (kIsWeb) {
+          await _audioPlayer!.play(UrlSource(_resolvedAudioPath!));
+        } else {
+          await _audioPlayer!.play(DeviceFileSource(_resolvedAudioPath!));
+        }
+      }
+    } else {
+      // Simulation
+      if (_isPlaying) {
+        _timer?.cancel();
+        setState(() {
+          _isPlaying = false;
+        });
+      } else {
+        if (_currentPosition >= _totalDuration) {
+          _currentPosition = Duration.zero;
+        }
+        setState(() {
+          _isPlaying = true;
+        });
+        _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+          if (!mounted) return;
+          setState(() {
+            final step = (100 * _playbackSpeed).toInt();
+            _currentPosition += Duration(milliseconds: step);
+            if (_currentPosition >= _totalDuration) {
+              _currentPosition = _totalDuration;
+              _isPlaying = false;
+              _timer?.cancel();
+            }
+          });
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleSpeed() async {
+    double newSpeed;
+    if (_playbackSpeed == 1.0) {
+      newSpeed = 1.5;
+    } else if (_playbackSpeed == 1.5) {
+      newSpeed = 2.0;
+    } else {
+      newSpeed = 1.0;
+    }
+
+    setState(() {
+      _playbackSpeed = newSpeed;
+    });
+
+    if (widget.message.audioBytes != null && _audioPlayer != null) {
+      await _audioPlayer!.setPlaybackRate(newSpeed);
+    }
+  }
+
+  Future<void> _onSeek(double milliseconds) async {
+    final newPos = Duration(milliseconds: milliseconds.toInt());
+    if (widget.message.audioBytes != null && _audioPlayer != null) {
+      await _audioPlayer!.seek(newPos);
+    } else {
+      setState(() {
+        _currentPosition = newPos;
+      });
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.toString();
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isSender ? platformTheme.senderText : platformTheme.receiverText;
+    final total = _totalDuration;
+    final double progressPct = total.inMilliseconds > 0 
+        ? _currentPosition.inMilliseconds / total.inMilliseconds 
+        : 0.0;
+
+    final textColor = widget.isSender ? widget.platformTheme.senderText : widget.platformTheme.receiverText;
+    final isWhatsApp = widget.platform == Platform.whatsapp;
+
+    if (isWhatsApp) {
+      // WhatsApp Voice Note Layout
+      if (widget.message.isVoiceNote) {
+        final bool isRead = widget.message.status == MessageStatus.read;
+        final Color playBtnColor = isRead ? const Color(0xFF34B7F1) : (widget.isSender ? textColor.withOpacity(0.8) : const Color(0xFF54656F));
+        final Color micIconColor = isRead ? const Color(0xFF34B7F1) : const Color(0xFF00A884);
+
+        return Container(
+          width: 250,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Row(
+            children: [
+              // Play/Pause button
+              GestureDetector(
+                onTap: _togglePlay,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: playBtnColor,
+                    size: 34,
+                  ),
+                ),
+              ),
+              // Waveform & Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Simulated waveform (22 vertical lines)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: List.generate(22, (i) {
+                        final h = 4.0 + (i % 4) * 4.0 + ((i * 2) % 6);
+                        final isPlayed = (i / 22.0) <= progressPct;
+                        final Color barColor = isPlayed
+                            ? (isRead ? const Color(0xFF34B7F1) : const Color(0xFF00A884))
+                            : textColor.withOpacity(0.25);
+                        return Container(
+                          width: 2.2,
+                          height: h,
+                          decoration: BoxDecoration(
+                            color: barColor,
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 6),
+                    // Duration, Timestamp & Speed Toggle
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(total - _currentPosition),
+                          style: TextStyle(color: textColor.withOpacity(0.55), fontSize: 10.5),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(widget.message.formattedTime, style: widget.platformTheme.timestampStyle),
+                            if (widget.isSender) ...[
+                              const SizedBox(width: 4),
+                              _StatusTick(
+                                status: widget.message.status,
+                                platformTheme: widget.platformTheme,
+                                forceSentTick: widget.isBlockedMe,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Avatar + Speed Pill
+              Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  // Circular Speaker Avatar
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: textColor.withOpacity(0.12),
+                    ),
+                    child: ClipOval(
+                      child: widget.isSender
+                          ? (widget.platformTheme.showReceiverAvatar // Outgoing
+                              ? const Icon(Icons.person_rounded, color: Colors.grey)
+                              : const Icon(Icons.person_rounded, color: Colors.grey))
+                          : (const Icon(Icons.person_rounded, color: Colors.grey)),
+                    ),
+                  ),
+                  // Mic icon badge
+                  Positioned(
+                    bottom: -2,
+                    left: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: micIconColor.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.mic_rounded,
+                          color: micIconColor,
+                          size: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Playback Speed Pill
+                  Positioned(
+                    top: -14,
+                    right: -4,
+                    child: GestureDetector(
+                      onTap: _toggleSpeed,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_playbackSpeed.toStringAsFixed(1).replaceAll('.0', '')}x',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: textColor.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      } else {
+        // WhatsApp Audio File Layout (Screenshot 2 style)
+        final Color sliderColor = widget.isSender ? const Color(0xFF00A884) : const Color(0xFF007FF5);
+
+        return Container(
+          width: 250,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Play/Pause button
+              GestureDetector(
+                onTap: _togglePlay,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Icon(
+                    _isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
+                    color: widget.isSender ? const Color(0xFF00A884) : const Color(0xFF54656F),
+                    size: 38,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Slider & File Metadata
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Dynamic Seekbar/Slider
+                    SizedBox(
+                      height: 18,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 2.5,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          activeTrackColor: sliderColor,
+                          inactiveTrackColor: textColor.withOpacity(0.18),
+                          thumbColor: sliderColor,
+                        ),
+                        child: Slider(
+                          value: progressPct,
+                          onChanged: (val) {
+                            _onSeek(total.inMilliseconds * val);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    // File Name & Duration
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        widget.message.fileName ?? 'AUD-20260614-WA0001.mp3',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Size/Duration & Timestamp Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${widget.message.fileSize ?? '1.2 MB'} • ${_formatDuration(_currentPosition)}',
+                          style: TextStyle(color: textColor.withOpacity(0.55), fontSize: 10),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(widget.message.formattedTime, style: widget.platformTheme.timestampStyle),
+                            if (widget.isSender) ...[
+                              const SizedBox(width: 4),
+                              _StatusTick(
+                                status: widget.message.status,
+                                platformTheme: widget.platformTheme,
+                                forceSentTick: widget.isBlockedMe,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Large Orange File Badge
+              Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.only(top: 4),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFF27B13),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.audiotrack_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+
+    // Generic fallbacks for Messenger / Instagram / Snapchat
+    final primaryColor = widget.isSender ? widget.platformTheme.sendButtonColor : const Color(0xFF8E8E93);
 
     return Container(
       width: 230,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: textColor.withOpacity(0.15),
+          GestureDetector(
+            onTap: _togglePlay,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: textColor.withOpacity(0.15),
+              ),
+              child: Icon(
+                _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: textColor,
+                size: 24,
+              ),
             ),
-            child: Icon(Icons.play_arrow_rounded, color: textColor, size: 24),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: List.generate(20, (i) {
-                    final h = 4.0 + (i % 5) * 4.0;
-                    return Container(
-                      width: 2.8,
-                      height: h,
-                      margin: const EdgeInsets.only(right: 2),
-                      decoration: BoxDecoration(
-                        color: textColor.withOpacity(0.5 + (i % 3) * 0.25),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    );
-                  }),
+                if (!widget.message.isVoiceNote) ...[
+                  Text(
+                    widget.message.fileName ?? 'Audio file',
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                // Seekbar Progress
+                Container(
+                  height: 3,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: textColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progressPct,
+                    child: Container(
+                      color: primaryColor,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _formatDuration(message.audioDuration),
-                      style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11),
+                      '${_formatDuration(_currentPosition)} / ${_formatDuration(total)}',
+                      style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 10.5),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (platform != Platform.messenger && platform != Platform.instagram)
-                          Text(message.formattedTime, style: platformTheme.timestampStyle),
-                        if (platform == Platform.whatsapp && isSender) ...[
-                          const SizedBox(width: 4),
-                          _StatusTick(status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
-                        ],
-                      ],
-                    ),
+                    if (widget.platform != Platform.messenger && widget.platform != Platform.instagram)
+                      Text(widget.message.formattedTime, style: widget.platformTheme.timestampStyle),
                   ],
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Stateful Video Player Widget ────────────────────────────────────────────
+
+class _VideoPlayerWidget extends StatefulWidget {
+  final ChatMessage message;
+  final bool isSender;
+  final Platform platform;
+  final PlatformTheme platformTheme;
+  final bool isBlockedMe;
+
+  const _VideoPlayerWidget({
+    required this.message,
+    required this.isSender,
+    required this.platform,
+    required this.platformTheme,
+    required this.isBlockedMe,
+  });
+
+  @override
+  State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _isPlaying = false;
+  Duration _currentPosition = Duration.zero;
+  Duration _totalDuration = Duration.zero;
+  String? _resolvedVideoPath;
+  bool _isInitializing = false;
+
+  // Timer for fallback/simulation when videoBytes is null
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _totalDuration = widget.message.audioDuration ?? const Duration(seconds: 15);
+    _resolveSource();
+  }
+
+  Future<void> _resolveSource() async {
+    if (widget.message.videoBytes != null) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = true;
+        });
+      }
+      final path = await VideoHelper.prepareVideoSource(widget.message.videoBytes!);
+      if (mounted && path != null) {
+        setState(() {
+          _resolvedVideoPath = path;
+        });
+        await _initVideoPlayer();
+      }
+    }
+  }
+
+  Future<void> _initVideoPlayer() async {
+    if (_resolvedVideoPath == null) return;
+    try {
+      VideoPlayerController controller;
+      if (kIsWeb) {
+        controller = VideoPlayerController.networkUrl(Uri.parse(_resolvedVideoPath!));
+      } else {
+        controller = VideoPlayerController.file(io.File(_resolvedVideoPath!));
+      }
+
+      _controller = controller;
+      await controller.initialize();
+      
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+          _totalDuration = controller.value.duration;
+          _isInitializing = false;
+        });
+
+        // Listen to position changes
+        controller.addListener(() {
+          if (mounted) {
+            setState(() {
+              _currentPosition = controller.value.position;
+              _isPlaying = controller.value.isPlaying;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error initializing video player: $e');
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _togglePlay() async {
+    if (widget.message.videoBytes != null) {
+      if (_isInitializing) return;
+      if (_controller == null || !_isInitialized) {
+        await _resolveSource();
+      }
+      if (_controller == null || !_isInitialized) return;
+
+      if (_isPlaying) {
+        await _controller!.pause();
+      } else {
+        await _controller!.play();
+      }
+    } else {
+      // Simulation
+      if (_isPlaying) {
+        _timer?.cancel();
+        setState(() {
+          _isPlaying = false;
+        });
+      } else {
+        final total = _totalDuration;
+        if (_currentPosition >= total) {
+          _currentPosition = Duration.zero;
+        }
+        setState(() {
+          _isPlaying = true;
+        });
+        _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+          if (!mounted) return;
+          setState(() {
+            _currentPosition += const Duration(milliseconds: 100);
+            if (_currentPosition >= total) {
+              _currentPosition = total;
+              _isPlaying = false;
+              _timer?.cancel();
+            }
+          });
+        });
+      }
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.toString();
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = _totalDuration;
+    final double progressPct = total.inMilliseconds > 0 
+        ? _currentPosition.inMilliseconds / total.inMilliseconds 
+        : 0.0;
+
+    final isWhatsApp = widget.platform == Platform.whatsapp;
+
+    if (widget.message.isVideoMessage) {
+      // Circular Video Note layout (Screenshot 1 & 2)
+      final Color activeRingColor = isWhatsApp 
+          ? const Color(0xFF25D366) // Green progress circle for WhatsApp
+          : (widget.platformTheme.sendButtonColor);
+
+      // Render circular preview
+      Widget circleBody = GestureDetector(
+        onTap: _togglePlay,
+        child: Container(
+          width: 200,
+          height: 200,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFF2A2A2A),
+          ),
+          child: CustomPaint(
+            painter: ProgressRingPainter(progress: progressPct, color: activeRingColor),
+            child: Padding(
+              padding: const EdgeInsets.all(5),
+              child: ClipOval(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Video player or image/placeholder
+                    if (_isInitialized && _controller != null)
+                      SizedBox.expand(
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          clipBehavior: Clip.hardEdge,
+                          child: SizedBox(
+                            width: _controller!.value.size.width,
+                            height: _controller!.value.size.height,
+                            child: VideoPlayer(_controller!),
+                          ),
+                        ),
+                      )
+                    else if (widget.message.imageBytes != null)
+                      Image.memory(
+                        widget.message.imageBytes!,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    else
+                      Container(
+                        color: const Color(0xFF1E1E1E),
+                        child: Center(
+                          child: _isInitializing 
+                              ? const SizedBox(
+                                  width: 32,
+                                  height: 32,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white24,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.videocam_rounded, color: Colors.white24, size: 48),
+                        ),
+                      ),
+
+                    // Play button overlay when paused and not initializing
+                    if (!_isPlaying && !_isInitializing)
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+
+                    // Bottom duration text badge
+                    Positioned(
+                      bottom: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _formatDuration(total - _currentPosition),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Wrapper Row containing forward share icon & timestamp pill underneath
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: widget.isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (!widget.isSender) ...[
+                  circleBody,
+                  const SizedBox(width: 8),
+                  // Translucent share arrow for incoming
+                  _buildShareArrow(),
+                ] else ...[
+                  // Translucent share arrow for outgoing
+                  _buildShareArrow(),
+                  const SizedBox(width: 8),
+                  circleBody,
+                ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Tiny green/translucent bubble for the time & checkmarks (under the circle)
+            Padding(
+              padding: EdgeInsets.only(
+                right: widget.isSender ? 16 : 0,
+                left: widget.isSender ? 0 : 16,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isWhatsApp 
+                      ? (widget.isSender ? const Color(0xFF202C33) : const Color(0xFF202C33)) 
+                      : Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.message.formattedTime,
+                      style: const TextStyle(color: Colors.white70, fontSize: 10),
+                    ),
+                    if (widget.isSender) ...[
+                      const SizedBox(width: 4),
+                      _StatusTick(
+                        status: widget.message.status,
+                        platformTheme: widget.platformTheme,
+                        forceSentTick: widget.isBlockedMe,
+                        colorOverride: const Color(0xFF34B7F1), // blue ticks
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Standard Video message layout (Rectangular attachment)
+      return Container(
+        width: 240,
+        height: 160,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: const Color(0xFF1E1E1E),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Frame image or video player
+            if (_isInitialized && _controller != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox.expand(
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: _controller!.value.size.width,
+                      height: _controller!.value.size.height,
+                      child: VideoPlayer(_controller!),
+                    ),
+                  ),
+                ),
+              )
+            else if (widget.message.imageBytes != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(
+                  widget.message.imageBytes!,
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              Center(
+                child: _isInitializing 
+                    ? const SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: CircularProgressIndicator(
+                          color: Colors.white24,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.videocam_rounded, color: Colors.white24, size: 48),
+              ),
+
+            // Play overlay button
+            GestureDetector(
+              onTap: _togglePlay,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+            ),
+
+            // Duration badge in bottom corner
+            Positioned(
+              bottom: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  _formatDuration(total - _currentPosition),
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+
+            // Timestamp and ticks badge in bottom corner
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.message.formattedTime,
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                    if (widget.isSender) ...[
+                      const SizedBox(width: 4),
+                      _StatusTick(
+                        status: widget.message.status,
+                        platformTheme: widget.platformTheme,
+                        forceSentTick: widget.isBlockedMe,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Linear Progress Ticker overlay at the very bottom
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                child: LinearProgressIndicator(
+                  value: progressPct,
+                  minHeight: 3,
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation<Color>(widget.platformTheme.sendButtonColor),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildShareArrow() {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.06),
+        shape: BoxShape.circle,
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.reply_rounded, // matches the share arrow look
+          color: Colors.white70,
+          size: 18,
+        ),
       ),
     );
   }
@@ -1412,25 +2425,30 @@ class _StatusTick extends StatelessWidget {
   final MessageStatus status;
   final PlatformTheme platformTheme;
   final bool forceSentTick;
+  final Color? colorOverride;
 
   const _StatusTick({
     required this.status,
     required this.platformTheme,
     this.forceSentTick = false,
+    this.colorOverride,
   });
 
   @override
   Widget build(BuildContext context) {
     final effectiveStatus = forceSentTick ? MessageStatus.sent : status;
+    final tickColor = colorOverride ?? platformTheme.tickColor;
+    final readTickColor = colorOverride ?? platformTheme.readTickColor;
+
     switch (effectiveStatus) {
       case MessageStatus.sending:
-        return Icon(Icons.access_time_rounded, size: 12, color: platformTheme.tickColor);
+        return Icon(Icons.access_time_rounded, size: 12, color: tickColor);
       case MessageStatus.sent:
-        return Icon(Icons.check_rounded, size: 12, color: platformTheme.tickColor);
+        return Icon(Icons.check_rounded, size: 12, color: tickColor);
       case MessageStatus.delivered:
-        return _DoubleTick(color: platformTheme.tickColor);
+        return _DoubleTick(color: tickColor);
       case MessageStatus.read:
-        return _DoubleTick(color: platformTheme.readTickColor);
+        return _DoubleTick(color: readTickColor);
     }
   }
 }
@@ -1637,6 +2655,51 @@ class _ReplyPreviewHeader extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ForwardedHeader extends StatelessWidget {
+  final bool isSender;
+  final PlatformTheme platformTheme;
+
+  const _ForwardedHeader({
+    required this.isSender,
+    required this.platformTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Provider.of<ThemeProvider>(context).isArabic;
+    final textColor = isSender ? platformTheme.senderText : platformTheme.receiverText;
+    final greyColor = textColor.withOpacity(0.45);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4, left: 4, right: 4, top: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Transform.flip(
+            flipX: !isArabic, // point right if LTR, point left if RTL
+            child: Icon(
+              Icons.reply_rounded,
+              size: 13,
+              color: greyColor,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isArabic ? 'مُحوّلة' : 'Forwarded',
+            style: TextStyle(
+              color: greyColor,
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }

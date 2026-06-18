@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
 import '../providers/theme_provider.dart';
@@ -24,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _isCapturing = false;
   bool _showEditor = true;
+  bool _isWebRecording = false;
   late AnimationController _panelAnimController;
   late Animation<double> _panelAnimation;
 
@@ -131,45 +133,198 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
     final platformTheme = PlatformTheme.of(session.platform, isDark: session.isDarkMode);
 
+    Widget bodyContent = Column(
+      children: [
+        // ── App top bar (always dark, part of our editor UI) ────────────
+        _buildTopBar(context, session),
+
+        // ── Phone mockup with screenshot boundary ───────────────────────
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: _showEditor ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    // Phone frame + screenshot zone
+                    _buildPhoneFrame(context, session, platformTheme, constraints),
+
+                    // Sender toggle bar
+                    if (_showEditor) _buildSenderToggle(context, chatProvider),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+
+        // ── Editor panel (slides in/out, NEVER captured) ─────────────────
+        SizeTransition(
+          sizeFactor: _panelAnimation,
+          axisAlignment: -1,
+          child: EditorPanel(
+            onCapture: _captureScreenshot,
+            isCapturing: _isCapturing,
+          ),
+        ),
+      ],
+    );
+
+    if (chatProvider.isPlayingConversation) {
+      bodyContent = Stack(
+        children: [
+          bodyContent,
+          Positioned(
+            bottom: 24,
+            left: 20,
+            right: 20,
+            child: _buildRecordingHUD(context, chatProvider),
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
       body: SafeArea(
-        child: Column(
-          children: [
-            // ── App top bar (always dark, part of our editor UI) ────────────
-            _buildTopBar(context, session),
+        child: bodyContent,
+      ),
+    );
+  }
 
-            // ── Phone mockup with screenshot boundary ───────────────────────
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    physics: _showEditor ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        // Phone frame + screenshot zone
-                        _buildPhoneFrame(context, session, platformTheme, constraints),
+  void _startChatPlayback(BuildContext context) {
+    final chatProvider = context.read<ChatProvider>();
+    
+    if (_showEditor) {
+      _toggleEditor();
+    }
 
-                        // Sender toggle bar
-                        if (_showEditor) _buildSenderToggle(context, chatProvider),
-                      ],
-                    ),
-                  );
-                },
+    chatProvider.startConversationPlayback(() {
+      if (mounted) {
+        setState(() {
+          if (_isWebRecording) {
+            _isWebRecording = false;
+            ScreenshotHelper.stopScreenRecord();
+          }
+        });
+        
+        final isAr = context.read<ThemeProvider>().isArabic;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isAr ? 'اكتمل تشغيل المحادثة تلقائيًا!' : 'Conversation playback completed!'),
+            backgroundColor: const Color(0xFF44BB44),
+          ),
+        );
+      }
+    });
+  }
+
+  Widget _buildRecordingHUD(BuildContext context, ChatProvider chatProvider) {
+    final isAr = context.read<ThemeProvider>().isArabic;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 15,
+            spreadRadius: 2,
+          ),
+        ],
+        border: Border.all(color: const Color(0xFF333333)),
+      ),
+      child: Row(
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.3, end: 1.0),
+            duration: const Duration(milliseconds: 700),
+            builder: (context, value, child) {
+              return Opacity(opacity: value, child: child);
+            },
+            onEnd: () {},
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: Colors.redAccent,
+                shape: BoxShape.circle,
               ),
             ),
-
-            // ── Editor panel (slides in/out, NEVER captured) ─────────────────
-            SizeTransition(
-              sizeFactor: _panelAnimation,
-              axisAlignment: -1,
-              child: EditorPanel(
-                onCapture: _captureScreenshot,
-                isCapturing: _isCapturing,
-              ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isAr ? 'تشغيل المحادثة تلقائيًا...' : 'PLAYING CONVERSATION...',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  _isWebRecording 
+                      ? (isAr ? 'يجري تسجيل الشاشة حاليًا' : 'Recording browser tab...')
+                      : (isAr ? 'شغّل مسجل الشاشة بهاتفك لالتقاطها' : 'Use device screen recorder to capture'),
+                  style: const TextStyle(color: Colors.white54, fontSize: 10),
+                ),
+              ],
             ),
+          ),
+          if (kIsWeb && !_isWebRecording) ...[
+            IconButton(
+              icon: const Icon(Icons.videocam_rounded, color: Colors.blueAccent),
+              tooltip: isAr ? 'تسجيل كفيديو (Web)' : 'Record to Video (Web)',
+              onPressed: () async {
+                final success = await ScreenshotHelper.startScreenRecord();
+                if (success) {
+                  setState(() {
+                    _isWebRecording = true;
+                  });
+                }
+              },
+            ),
+            const SizedBox(width: 8),
           ],
-        ),
+          if (_isWebRecording) ...[
+            IconButton(
+              icon: const Icon(Icons.videocam_off_rounded, color: Colors.redAccent),
+              tooltip: isAr ? 'إيقاف التسجيل' : 'Stop Web Record',
+              onPressed: () {
+                setState(() {
+                  _isWebRecording = false;
+                });
+                ScreenshotHelper.stopScreenRecord();
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE1306C),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            icon: const Icon(Icons.stop_rounded, size: 16),
+            label: Text(isAr ? 'إيقاف' : 'Stop', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            onPressed: () {
+              if (_isWebRecording) {
+                ScreenshotHelper.stopScreenRecord();
+                setState(() {
+                  _isWebRecording = false;
+                });
+              }
+              chatProvider.stopConversationPlayback();
+            },
+          ),
+        ],
       ),
     );
   }
@@ -247,6 +402,37 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 _showEditor ? Icons.edit_rounded : Icons.edit_off_rounded,
                 size: 18,
                 color: _showEditor ? const Color(0xFF6C63FF) : Colors.white38,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Play/Record button
+          GestureDetector(
+            onTap: () {
+              if (chatProvider.isPlayingConversation) {
+                if (_isWebRecording) {
+                  ScreenshotHelper.stopScreenRecord();
+                  setState(() {
+                    _isWebRecording = false;
+                  });
+                }
+                chatProvider.stopConversationPlayback();
+              } else {
+                _startChatPlayback(context);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: chatProvider.isPlayingConversation
+                    ? const Color(0xFFE1306C)
+                    : const Color(0xFF242424),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                chatProvider.isPlayingConversation ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                size: 18,
+                color: chatProvider.isPlayingConversation ? Colors.white : Colors.white70,
               ),
             ),
           ),
