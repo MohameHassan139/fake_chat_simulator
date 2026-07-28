@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 import '../utils/audio_helper.dart';
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
@@ -15,6 +16,7 @@ import '../utils/language_helper.dart';
 import 'contact_editor_sheet.dart';
 import 'settings_editor_sheet.dart';
 import 'message_editor_sheet.dart';
+import 'background_remover_dialog.dart';
 
 class EditorPanel extends StatelessWidget {
   final VoidCallback onCapture;
@@ -185,10 +187,11 @@ class EditorPanel extends StatelessWidget {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF111111),
-        border: Border(top: BorderSide(color: Color(0xFF222222))),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : Colors.white,
+        border: Border(top: BorderSide(color: isDark ? const Color(0xFF222222) : const Color(0xFFE2E2E2))),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -239,6 +242,12 @@ class _ActionRow extends StatelessWidget {
                     icon: Icons.image_outlined,
                     label: LanguageHelper.translate('image', isAr),
                     onTap: () => _pickImage(context),
+                  ),
+                  const SizedBox(width: 16),
+                  _ActionButton(
+                    icon: Icons.sticky_note_2_outlined,
+                    label: LanguageHelper.translate('sticker', isAr),
+                    onTap: () => _showStickerOptions(context),
                   ),
                   const SizedBox(width: 16),
                   _ActionButton(
@@ -345,6 +354,79 @@ class _ActionRow extends StatelessWidget {
         isSender: chatProvider.isSenderMode,
         timestamp: DateTime.now(),
       );
+    }
+  }
+
+  void _showStickerOptions(BuildContext context) {
+    final isAr = context.read<ThemeProvider>().isArabic;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.image_outlined, color: Color(0xFF25D366)),
+              title: Text(isAr ? 'إضافة صورة كملصق مباشرة' : 'Add Image as Sticker (Direct)', style: const TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _pickStickerDirect(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_fix_high_rounded, color: Color(0xFFFF6584)),
+              title: Text(isAr ? 'إضافة ملصق وإزالة الخلفية تلقائيًا' : 'Add Sticker with Background Removal', style: const TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _pickStickerAndRemoveBackground(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickStickerDirect(BuildContext context) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
+    if (file != null && context.mounted) {
+      final bytes = await file.readAsBytes();
+      final chatProvider = context.read<ChatProvider>();
+      chatProvider.addMessage(ChatMessage(
+        id: const Uuid().v4(),
+        text: '',
+        type: MessageType.sticker,
+        isSender: chatProvider.isSenderMode,
+        timestamp: DateTime.now(),
+        imageBytes: bytes,
+      ));
+    }
+  }
+
+  Future<void> _pickStickerAndRemoveBackground(BuildContext context) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
+    if (file != null && context.mounted) {
+      final bytes = await file.readAsBytes();
+      if (!context.mounted) return;
+      final processedBytes = await showDialog<Uint8List>(
+        context: context,
+        builder: (_) => BackgroundRemoverDialog(originalBytes: bytes),
+      );
+      if (processedBytes != null && context.mounted) {
+        final chatProvider = context.read<ChatProvider>();
+        chatProvider.addMessage(ChatMessage(
+          id: const Uuid().v4(),
+          text: '',
+          type: MessageType.sticker,
+          isSender: chatProvider.isSenderMode,
+          timestamp: DateTime.now(),
+          imageBytes: processedBytes,
+        ));
+      }
     }
   }
 
@@ -479,17 +561,21 @@ class _ActionRow extends StatelessWidget {
 
   void _addCallMessage(BuildContext context) {
     final chatProvider = context.read<ChatProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final isAr = context.read<ThemeProvider>().isArabic;
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Add Call', style: TextStyle(color: Colors.white)),
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        title: Text(LanguageHelper.translate('add_call', isAr), style: TextStyle(color: textColor)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.phone, color: Color(0xFF6C63FF)),
-              title: const Text('Voice Call', style: TextStyle(color: Colors.white)),
+              title: Text(LanguageHelper.translate('voice_call', isAr), style: TextStyle(color: textColor)),
               onTap: () {
                 chatProvider.addCallMessage(
                   isVideo: false,
@@ -501,7 +587,7 @@ class _ActionRow extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.videocam, color: Color(0xFF6C63FF)),
-              title: const Text('Video Call', style: TextStyle(color: Colors.white)),
+              title: Text(LanguageHelper.translate('video_call', isAr), style: TextStyle(color: textColor)),
               onTap: () {
                 chatProvider.addCallMessage(
                   isVideo: true,
@@ -559,6 +645,15 @@ class _QuickAddRowState extends State<_QuickAddRow> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5);
+    final borderCol = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE2E2E2);
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.white24 : Colors.black38;
+    final iconBg = isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE);
+    final iconColor = isDark ? Colors.white54 : Colors.black54;
+
+    final isAr = context.read<ThemeProvider>().isArabic;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: Row(
@@ -567,18 +662,18 @@ class _QuickAddRowState extends State<_QuickAddRow> {
             child: Container(
               height: 42,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
+                color: inputBg,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
+                border: Border.all(color: borderCol),
               ),
               child: TextField(
                 controller: _controller,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: const InputDecoration(
-                  hintText: 'Type a message to add...',
-                  hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                style: TextStyle(color: textColor, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: LanguageHelper.translate('type_message_to_add', isAr),
+                  hintStyle: TextStyle(color: hintColor, fontSize: 14),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                 ),
                 onSubmitted: (_) => _sendMessage(context),
               ),
@@ -604,10 +699,10 @@ class _QuickAddRowState extends State<_QuickAddRow> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: const Color(0xFF242424),
+                color: iconBg,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.tune_rounded, color: Colors.white54, size: 20),
+              child: Icon(Icons.tune_rounded, color: iconColor, size: 20),
             ),
           ),
         ],
@@ -641,16 +736,17 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 20, color: Colors.white54),
+          Icon(icon, size: 20, color: isDark ? Colors.white54 : Colors.black54),
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 9, color: Colors.white38, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : Colors.black45, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -785,8 +881,14 @@ class VoiceRecorderDialogState extends State<VoiceRecorderDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final labelColor = isDark ? Colors.white60 : Colors.black54;
+    final cancelColor = isDark ? Colors.white38 : Colors.black45;
+
+    final isAr = context.read<ThemeProvider>().isArabic;
     return AlertDialog(
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -813,10 +915,10 @@ class VoiceRecorderDialogState extends State<VoiceRecorderDialog> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'RECORDING VOICE NOTE',
+              Text(
+                LanguageHelper.translate('recording_voice_note', isAr),
                 style: TextStyle(
-                  color: Colors.white60,
+                  color: labelColor,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.0,
@@ -848,8 +950,8 @@ class VoiceRecorderDialogState extends State<VoiceRecorderDialog> {
           // Timer counter text
           Text(
             _formatTimerText(_secondsElapsed),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 32,
               fontWeight: FontWeight.w700,
             ),
@@ -860,7 +962,7 @@ class VoiceRecorderDialogState extends State<VoiceRecorderDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+          child: Text(LanguageHelper.translate('cancel', isAr), style: TextStyle(color: cancelColor)),
         ),
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
@@ -870,7 +972,7 @@ class VoiceRecorderDialogState extends State<VoiceRecorderDialog> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
           icon: const Icon(Icons.stop_circle_rounded),
-          label: const Text('Stop & Save'),
+          label: Text(LanguageHelper.translate('stop_save', isAr)),
           onPressed: _stopAndSave,
         ),
       ],
@@ -930,10 +1032,16 @@ class _AudioFileDialogState extends State<_AudioFileDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final labelColor = isDark ? Colors.white38 : Colors.black45;
+    final containerBg = isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE);
+    final isAr = context.read<ThemeProvider>().isArabic;
+
     return AlertDialog(
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Add Audio File', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      title: Text(LanguageHelper.translate('add_audio_file', isAr), style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -945,10 +1053,10 @@ class _AudioFileDialogState extends State<_AudioFileDialog> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF242424),
+                  color: containerBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _audioBytes != null ? const Color(0xFF6C63FF) : Colors.white12,
+                    color: _audioBytes != null ? const Color(0xFF6C63FF) : (isDark ? Colors.white12 : Colors.black12),
                     width: _audioBytes != null ? 1.5 : 1,
                   ),
                 ),
@@ -957,19 +1065,19 @@ class _AudioFileDialogState extends State<_AudioFileDialog> {
                   children: [
                     Icon(
                       _audioBytes != null ? Icons.audiotrack_rounded : Icons.library_music_rounded,
-                      color: _audioBytes != null ? const Color(0xFF6C63FF) : Colors.white38,
+                      color: _audioBytes != null ? const Color(0xFF6C63FF) : labelColor,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _audioBytes != null
-                            ? 'Audio loaded: ${_nameController.text}'
-                            : 'Tap to Pick Audio File',
+                            ? '${LanguageHelper.translate('audio_loaded', isAr)}: ${_nameController.text}'
+                            : LanguageHelper.translate('tap_to_pick_audio', isAr),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: _audioBytes != null ? Colors.white : Colors.white38,
+                          color: _audioBytes != null ? textColor : labelColor,
                           fontSize: 13,
                         ),
                       ),
@@ -979,23 +1087,23 @@ class _AudioFileDialogState extends State<_AudioFileDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('File Name', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(LanguageHelper.translate('file_name', isAr), style: TextStyle(color: labelColor, fontSize: 12)),
             const SizedBox(height: 6),
             TextField(
               controller: _nameController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: textColor),
               decoration: const InputDecoration(hintText: 'e.g. Song.mp3'),
             ),
             const SizedBox(height: 14),
-            const Text('File Size', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(LanguageHelper.translate('file_size', isAr), style: TextStyle(color: labelColor, fontSize: 12)),
             const SizedBox(height: 6),
             TextField(
               controller: _sizeController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: textColor),
               decoration: const InputDecoration(hintText: 'e.g. 4.2 MB'),
             ),
             const SizedBox(height: 18),
-            const Text('Audio Duration', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(LanguageHelper.translate('audio_duration', isAr), style: TextStyle(color: labelColor, fontSize: 12)),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1009,9 +1117,9 @@ class _AudioFileDialogState extends State<_AudioFileDialog> {
                     onChanged: (v) => setState(() => _minutes = v),
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(':', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(':', style: TextStyle(color: textColor, fontSize: 24, fontWeight: FontWeight.bold)),
                 ),
                 Flexible(
                   child: _NumberPicker(
@@ -1030,7 +1138,7 @@ class _AudioFileDialogState extends State<_AudioFileDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+          child: Text(LanguageHelper.translate('cancel', isAr), style: TextStyle(color: labelColor)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -1043,7 +1151,7 @@ class _AudioFileDialogState extends State<_AudioFileDialog> {
             widget.onConfirm(Duration(minutes: _minutes, seconds: _seconds), fileName, fileSize, _audioBytes);
             Navigator.pop(context);
           },
-          child: const Text('Add'),
+          child: Text(LanguageHelper.translate('save', isAr)),
         ),
       ],
     );
@@ -1076,32 +1184,45 @@ class _VideoFormatChooseDialogState extends State<_VideoFormatChooseDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final labelColor = isDark ? Colors.white38 : Colors.black45;
+    final containerBg = isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE);
+    final dropdownBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final isAr = context.read<ThemeProvider>().isArabic;
+
     return AlertDialog(
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Configure Video Component', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      title: Text(LanguageHelper.translate('configure_video', isAr), style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Layout Format', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(LanguageHelper.translate('layout_format', isAr), style: TextStyle(color: labelColor, fontSize: 12)),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF242424),
+                color: containerBg,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<bool>(
                   value: _isVideoMessage,
-                  dropdownColor: const Color(0xFF1E1E1E),
+                  dropdownColor: dropdownBg,
                   isExpanded: true,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  items: const [
-                    DropdownMenuItem(value: true, child: Text('Instant Video Note (Circular)')),
-                    DropdownMenuItem(value: false, child: Text('Standard Video Attachment (Rectangular)')),
+                  style: TextStyle(color: textColor, fontSize: 14),
+                  items: [
+                    DropdownMenuItem(
+                      value: true,
+                      child: Text(LanguageHelper.translate('instant_video_note', isAr), style: TextStyle(color: textColor)),
+                    ),
+                    DropdownMenuItem(
+                      value: false,
+                      child: Text(LanguageHelper.translate('standard_video_attachment', isAr), style: TextStyle(color: textColor)),
+                    ),
                   ],
                   onChanged: (v) {
                     if (v != null) {
@@ -1115,23 +1236,23 @@ class _VideoFormatChooseDialogState extends State<_VideoFormatChooseDialog> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text('File Name', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(LanguageHelper.translate('file_name', isAr), style: TextStyle(color: labelColor, fontSize: 12)),
             const SizedBox(height: 6),
             TextField(
               controller: _nameController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: textColor),
               decoration: const InputDecoration(hintText: 'e.g. video.mp4'),
             ),
             const SizedBox(height: 14),
-            const Text('File Size', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(LanguageHelper.translate('file_size', isAr), style: TextStyle(color: labelColor, fontSize: 12)),
             const SizedBox(height: 6),
             TextField(
               controller: _sizeController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: textColor),
               decoration: const InputDecoration(hintText: 'e.g. 5.6 MB'),
             ),
             const SizedBox(height: 18),
-            const Text('Video Duration', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(LanguageHelper.translate('video_duration', isAr), style: TextStyle(color: labelColor, fontSize: 12)),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1145,9 +1266,9 @@ class _VideoFormatChooseDialogState extends State<_VideoFormatChooseDialog> {
                     onChanged: (v) => setState(() => _minutes = v),
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(':', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(':', style: TextStyle(color: textColor, fontSize: 24, fontWeight: FontWeight.bold)),
                 ),
                 Flexible(
                   child: _NumberPicker(
@@ -1166,7 +1287,7 @@ class _VideoFormatChooseDialogState extends State<_VideoFormatChooseDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+          child: Text(LanguageHelper.translate('cancel', isAr), style: TextStyle(color: labelColor)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -1179,7 +1300,7 @@ class _VideoFormatChooseDialogState extends State<_VideoFormatChooseDialog> {
             widget.onConfirm(_isVideoMessage, Duration(minutes: _minutes, seconds: _seconds), fileName, fileSize);
             Navigator.pop(context);
           },
-          child: const Text('Confirm & Add'),
+          child: Text(LanguageHelper.translate('confirm_add', isAr)),
         ),
       ],
     );
@@ -1203,15 +1324,19 @@ class _NumberPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final labelColor = isDark ? Colors.white38 : Colors.black45;
+
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+        Text(label, style: TextStyle(color: labelColor, fontSize: 12)),
         const SizedBox(height: 4),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.remove_circle_outline, color: Colors.white38),
+              icon: Icon(Icons.remove_circle_outline, color: labelColor),
               iconSize: 22,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               padding: EdgeInsets.zero,
@@ -1225,7 +1350,7 @@ class _NumberPicker extends StatelessWidget {
               child: Text(
                 value.toString().padLeft(2, '0'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
+                style: TextStyle(color: textColor, fontSize: 22, fontWeight: FontWeight.w600),
               ),
             ),
             IconButton(

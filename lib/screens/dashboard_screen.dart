@@ -371,6 +371,7 @@ class _PlatformListTile extends StatelessWidget {
     final chatProvider = context.read<ChatProvider>();
     final colorScheme = Theme.of(context).colorScheme;
     final onSurface = colorScheme.onSurface;
+    final isAr = context.read<ThemeProvider>().isArabic;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -415,7 +416,7 @@ class _PlatformListTile extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      _desc(platform),
+                      _desc(platform, isAr),
                       style: TextStyle(
                         fontSize: 12,
                         color: onSurface.withValues(alpha: 0.4),
@@ -464,12 +465,12 @@ class _PlatformListTile extends StatelessWidget {
     }
   }
 
-  String _desc(Platform p) {
+  String _desc(Platform p, bool isAr) {
     switch (p) {
-      case Platform.whatsapp: return 'Green bubbles · Read receipts · Status bar';
-      case Platform.messenger: return 'Gradient bubbles · Avatars · Reactions';
-      case Platform.instagram: return 'Gradient · Seen status · Stories';
-      case Platform.snapchat: return 'Minimal · Blue bubbles · Snap streaks';
+      case Platform.whatsapp: return LanguageHelper.translate('whatsapp_desc', isAr);
+      case Platform.messenger: return LanguageHelper.translate('messenger_desc', isAr);
+      case Platform.instagram: return LanguageHelper.translate('instagram_desc', isAr);
+      case Platform.snapchat: return LanguageHelper.translate('snapchat_desc', isAr);
     }
   }
 }

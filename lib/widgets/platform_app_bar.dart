@@ -4,6 +4,7 @@ import '../models/chat_models.dart';
 import '../themes/platform_themes.dart';
 import '../providers/chat_provider.dart';
 import '../providers/theme_provider.dart';
+import '../utils/language_helper.dart';
 
 class PlatformAppBar extends StatelessWidget {
   final ChatSession session;
@@ -90,13 +91,22 @@ class _WhatsAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
+    final isAr = context.read<ThemeProvider>().isArabic;
+    final isTyping = (chatProvider.isPlayingConversation
+        ? chatProvider.simulatedContactStatus == 'typing...'
+        : session.contactUser.onlineStatus == UserOnlineStatus.typing);
+
     final String statusText = (session.isBlocked || session.isBlockedMe)
         ? ''
         : (chatProvider.isPlayingConversation
-            ? (chatProvider.simulatedContactStatus ?? 'online')
+            ? (chatProvider.simulatedContactStatus == 'online'
+                ? LanguageHelper.translate('online', isAr)
+                : (chatProvider.simulatedContactStatus == 'typing...'
+                    ? LanguageHelper.translate('typing', isAr)
+                    : (chatProvider.simulatedContactStatus ?? '')))
             : (session.contactUser.onlineStatus == UserOnlineStatus.typing
-                ? 'typing...'
-                : session.contactUser.statusText));
+                ? LanguageHelper.translate('typing', isAr)
+                : session.contactUser.statusText(isAr)));
 
     return Container(
       height: 58,
@@ -139,11 +149,11 @@ class _WhatsAppBar extends StatelessWidget {
                   Text(
                     statusText,
                     style: TextStyle(
-                      color: statusText == 'typing...'
+                      color: isTyping
                           ? const Color(0xFF25D366)
                           : Colors.white.withValues(alpha: 0.85),
                       fontSize: 11.5,
-                      fontWeight: statusText == 'typing...' ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isTyping ? FontWeight.bold : FontWeight.normal,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -225,6 +235,7 @@ class _MessengerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
+    final isAr = context.read<ThemeProvider>().isArabic;
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -283,10 +294,14 @@ class _MessengerBar extends StatelessWidget {
                   const SizedBox(height: 1),
                   Text(
                     chatProvider.isPlayingConversation
-                        ? (chatProvider.simulatedContactStatus ?? 'Active now')
+                        ? (chatProvider.simulatedContactStatus == 'Active now'
+                            ? LanguageHelper.translate('active_now', isAr)
+                            : (chatProvider.simulatedContactStatus == 'typing...'
+                                ? LanguageHelper.translate('typing', isAr)
+                                : (chatProvider.simulatedContactStatus ?? '')))
                         : (session.contactUser.onlineStatus == UserOnlineStatus.typing
-                            ? 'typing...'
-                            : session.contactUser.statusText),
+                            ? LanguageHelper.translate('typing', isAr)
+                            : session.contactUser.statusText(isAr)),
                     style: const TextStyle(
                       color: Color(0xFF65676B),
                       fontSize: 11.5,
@@ -363,6 +378,7 @@ class _InstagramBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
+    final isAr = context.read<ThemeProvider>().isArabic;
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -419,10 +435,14 @@ class _InstagramBar extends StatelessWidget {
                   const SizedBox(height: 1),
                   Text(
                     chatProvider.isPlayingConversation
-                        ? (chatProvider.simulatedContactStatus ?? 'Active now')
+                        ? (chatProvider.simulatedContactStatus == 'Active now'
+                            ? LanguageHelper.translate('active_now', isAr)
+                            : (chatProvider.simulatedContactStatus == 'typing...'
+                                ? LanguageHelper.translate('typing', isAr)
+                                : (chatProvider.simulatedContactStatus ?? '')))
                         : (session.contactUser.onlineStatus == UserOnlineStatus.typing
-                            ? 'typing...'
-                            : session.contactUser.statusText),
+                            ? LanguageHelper.translate('typing', isAr)
+                            : session.contactUser.statusText(isAr)),
                     style: const TextStyle(
                       color: Color(0xFF999999),
                       fontSize: 11,
@@ -499,6 +519,7 @@ class _SnapchatBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
+    final isAr = context.read<ThemeProvider>().isArabic;
     return Container(
       height: 56,
       decoration: const BoxDecoration(
@@ -547,7 +568,11 @@ class _SnapchatBar extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          chatProvider.simulatedContactStatus ?? 'Active now',
+                          chatProvider.simulatedContactStatus == 'Active now'
+                              ? LanguageHelper.translate('active_now', isAr)
+                              : (chatProvider.simulatedContactStatus == 'typing...'
+                                  ? LanguageHelper.translate('typing', isAr)
+                                  : (chatProvider.simulatedContactStatus ?? '')),
                           style: const TextStyle(
                             color: Color(0xFF666666),
                             fontSize: 11,
@@ -572,8 +597,8 @@ class _SnapchatBar extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           session.contactUser.onlineStatus == UserOnlineStatus.typing
-                              ? 'typing...'
-                              : 'Active now',
+                              ? LanguageHelper.translate('typing', isAr)
+                              : LanguageHelper.translate('active_now', isAr),
                           style: const TextStyle(
                             color: Color(0xFF666666),
                             fontSize: 11,
@@ -585,7 +610,7 @@ class _SnapchatBar extends StatelessWidget {
                   ] else ...[
                     const SizedBox(height: 1),
                     Text(
-                      session.contactUser.statusText,
+                      session.contactUser.statusText(isAr),
                       style: const TextStyle(
                         color: Color(0xFF666666),
                         fontSize: 11,

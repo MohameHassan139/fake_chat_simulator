@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' as io;
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -42,7 +43,7 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (platform == Platform.messenger || platform == Platform.instagram) {
-      if (message.type == MessageType.voiceCall || message.type == MessageType.videoCall) {
+      if ((message.type == MessageType.voiceCall || message.type == MessageType.videoCall) && !message.isDeleted) {
         return _buildNativeCallRecord(context);
       }
     }
@@ -249,68 +250,102 @@ class MessageBubble extends StatelessWidget {
       }
     }
 
+    if (message.type == MessageType.sticker && !message.isDeleted) {
+      return _StickerContent(
+        message: message,
+        isSender: isSender,
+        platform: platform,
+        platformTheme: platformTheme,
+      );
+    }
+
     Widget bubbleContent;
 
     final bool isRtl = isArabicLocale || _isArabic(message.text);
     final hasReply =
         message.repliedToId != null && message.repliedToText != null;
 
-    switch (message.type) {
-      case MessageType.text:
-        bubbleContent = _TextContent(
-          message: message,
-          isSender: isSender,
-          platform: platform,
-          platformTheme: platformTheme,
-          hasReply: hasReply,
-          isBlockedMe: isBlockedMe,
-        );
-        break;
-      case MessageType.image:
-        bubbleContent = _ImageContent(
-          message: message,
-          isSender: isSender,
-          platform: platform,
-          platformTheme: platformTheme,
-          isBlockedMe: isBlockedMe,
-        );
-        break;
-      case MessageType.audio:
-        bubbleContent = _AudioPlayerWidget(
-          message: message,
-          isSender: isSender,
-          platform: platform,
-          platformTheme: platformTheme,
-          isBlockedMe: isBlockedMe,
-        );
-        break;
-      case MessageType.video:
-        bubbleContent = _VideoPlayerWidget(
-          message: message,
-          isSender: isSender,
-          platform: platform,
-          platformTheme: platformTheme,
-          isBlockedMe: isBlockedMe,
-        );
-        break;
-      case MessageType.voiceCall:
-      case MessageType.videoCall:
-        bubbleContent = _CallContent(
-          message: message,
-          isSender: isSender,
-          platform: platform,
-          platformTheme: platformTheme,
-          isBlockedMe: isBlockedMe,
-        );
-        break;
-      default:
-        bubbleContent = _TextContent(
-          message: message,
-          isSender: isSender,
-          platform: platform,
-          platformTheme: platformTheme,
-          isBlockedMe: isBlockedMe,
-        );
+    if (message.isDeleted) {
+      bubbleContent = _DeletedMessageContent(
+        message: message,
+        isSender: isSender,
+        platform: platform,
+        platformTheme: platformTheme,
+        contactName: contactUser.name,
+      );
+    } else if (message.isOneTime) {
+      bubbleContent = _OneTimeContent(
+        message: message,
+        isSender: isSender,
+        platform: platform,
+        platformTheme: platformTheme,
+      );
+    } else {
+      switch (message.type) {
+        case MessageType.sticker:
+          bubbleContent = _StickerContent(
+            message: message,
+            isSender: isSender,
+            platform: platform,
+            platformTheme: platformTheme,
+          );
+          break;
+        case MessageType.text:
+          bubbleContent = _TextContent(
+            message: message,
+            isSender: isSender,
+            platform: platform,
+            platformTheme: platformTheme,
+            hasReply: hasReply,
+            isBlockedMe: isBlockedMe,
+          );
+          break;
+        case MessageType.image:
+          bubbleContent = _ImageContent(
+            message: message,
+            isSender: isSender,
+            platform: platform,
+            platformTheme: platformTheme,
+            isBlockedMe: isBlockedMe,
+          );
+          break;
+        case MessageType.audio:
+          bubbleContent = _AudioPlayerWidget(
+            message: message,
+            isSender: isSender,
+            platform: platform,
+            platformTheme: platformTheme,
+            isBlockedMe: isBlockedMe,
+          );
+          break;
+        case MessageType.video:
+          bubbleContent = _VideoPlayerWidget(
+            message: message,
+            isSender: isSender,
+            platform: platform,
+            platformTheme: platformTheme,
+            isBlockedMe: isBlockedMe,
+          );
+          break;
+        case MessageType.voiceCall:
+        case MessageType.videoCall:
+          bubbleContent = _CallContent(
+            message: message,
+            isSender: isSender,
+            platform: platform,
+            platformTheme: platformTheme,
+            isBlockedMe: isBlockedMe,
+          );
+          break;
+        default:
+          bubbleContent = _TextContent(
+            message: message,
+            isSender: isSender,
+            platform: platform,
+            platformTheme: platformTheme,
+            isBlockedMe: isBlockedMe,
+          );
+      }
     }
 
     var finalContent = hasReply
@@ -395,6 +430,7 @@ class MessageBubble extends StatelessWidget {
       isSender: isSender,
       borderRadius: borderRadius,
       platformTheme: platformTheme,
+      isDeleted: message.isDeleted,
       child: finalContent,
     );
   }
@@ -811,16 +847,32 @@ class _BubbleContainer extends StatelessWidget {
   final BorderRadius borderRadius;
   final PlatformTheme platformTheme;
   final Widget child;
+  final bool isDeleted;
 
   const _BubbleContainer({
     required this.isSender,
     required this.borderRadius,
     required this.platformTheme,
     required this.child,
+    this.isDeleted = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Real Messenger/Instagram render a deleted/unsent message as a bare
+    // outlined pill (no fill) instead of the normal solid chat bubble.
+    if (isDeleted) {
+      final borderColor = (isSender ? platformTheme.senderText : platformTheme.receiverText).withValues(alpha: 0.3);
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: borderRadius,
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: child,
+      );
+    }
+
     if (isSender && platformTheme.gradientSenderBubble && platformTheme.senderGradient != null) {
       return Container(
         decoration: BoxDecoration(
@@ -874,7 +926,8 @@ class _TextContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = isSender ? platformTheme.senderText : platformTheme.receiverText;
-    final bool isRtl = _isArabic(message.text);
+    final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+    final bool isRtlText = _isArabic(message.text);
 
     if (platform == Platform.whatsapp) {
       return Stack(
@@ -882,25 +935,25 @@ class _TextContent extends StatelessWidget {
           Padding(
             padding: EdgeInsets.only(
               bottom: 10,
-              left: isRtl ? (isSender ? 55 : 38) : 0,
-              right: isRtl ? 0 : (isSender ? 55 : 38),
+              left: isArabicLocale ? (isSender ? 55 : 38) : (isRtlText ? 38 : 0),
+              right: isArabicLocale ? 0 : (isRtlText ? 0 : (isSender ? 55 : 38)),
             ),
             child: Text(
               message.text,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
+              textAlign: isRtlText ? TextAlign.right : TextAlign.left,
               style: platformTheme.messageStyle.copyWith(color: textColor),
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+              textDirection: isRtlText ? TextDirection.rtl : TextDirection.ltr,
             ),
           ),
           Positioned(
             bottom: -2,
-            left: isRtl ? 0 : null,
-            right: isRtl ? null : 0,
+            left: isArabicLocale ? 0 : null,
+            right: isArabicLocale ? null : 0,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (isRtl && isSender) ...[
+                if (isArabicLocale && isSender) ...[
                   _StatusTick(
                       status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
                   const SizedBox(width: 3),
@@ -915,7 +968,7 @@ class _TextContent extends StatelessWidget {
                     fontSize: 10.5,
                   ),
                 ),
-                if (!isRtl && isSender) ...[
+                if (!isArabicLocale && isSender) ...[
                   const SizedBox(width: 3),
                   _StatusTick(
                       status: message.status, platformTheme: platformTheme, forceSentTick: isBlockedMe),
@@ -932,9 +985,9 @@ class _TextContent extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Text(
           message.text,
-          textAlign: isRtl ? TextAlign.right : TextAlign.left,
+          textAlign: isRtlText ? TextAlign.right : TextAlign.left,
           style: platformTheme.messageStyle.copyWith(color: textColor),
-          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+          textDirection: isRtlText ? TextDirection.rtl : TextDirection.ltr,
         ),
       );
     }
@@ -943,19 +996,19 @@ class _TextContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
       child: Column(
         crossAxisAlignment:
-            isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            isRtlText ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Text(
             message.text,
-            textAlign: isRtl ? TextAlign.right : TextAlign.left,
+            textAlign: isRtlText ? TextAlign.right : TextAlign.left,
             style: platformTheme.messageStyle.copyWith(color: textColor),
-            textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+            textDirection: isRtlText ? TextDirection.rtl : TextDirection.ltr,
           ),
           const SizedBox(height: 2),
           Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment:
-                isRtl ? MainAxisAlignment.start : MainAxisAlignment.end,
+                isArabicLocale ? MainAxisAlignment.start : MainAxisAlignment.end,
             children: [
               Text(
                 message.formattedTime,
@@ -1123,13 +1176,17 @@ class _ImageContentState extends State<_ImageContent> {
       );
     }
 
+    final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+    final bool isRtlText = _isArabic(widget.message.text);
+
     if (shouldOverlayTimestamp) {
       imageWidget = Stack(
         children: [
           imageWidget,
           Positioned(
             bottom: 8,
-            right: 8,
+            left: isArabicLocale ? 8 : null,
+            right: isArabicLocale ? null : 8,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
@@ -1139,11 +1196,20 @@ class _ImageContentState extends State<_ImageContent> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (isArabicLocale && widget.isSender) ...[
+                    _StatusTick(
+                      status: widget.message.status,
+                      platformTheme: widget.platformTheme,
+                      forceSentTick: widget.isBlockedMe,
+                      colorOverride: const Color(0xFF34B7F1), // blue ticks on media overlay
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Text(
                     widget.message.formattedTime,
                     style: const TextStyle(color: Colors.white, fontSize: 10),
                   ),
-                  if (widget.isSender) ...[
+                  if (!isArabicLocale && widget.isSender) ...[
                     const SizedBox(width: 4),
                     _StatusTick(
                       status: widget.message.status,
@@ -1160,6 +1226,75 @@ class _ImageContentState extends State<_ImageContent> {
       );
     }
 
+    if (hasCaption) {
+      final isDark = widget.platformTheme.chatBg == Colors.black || widget.platformTheme.chatBg.value == 0xFF0B141A;
+      final timeColor = isDark ? const Color(0xFF8696A0) : const Color(0xFF667781);
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(innerRadius),
+        child: SizedBox(
+          width: bubbleWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              imageWidget,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Align(
+                      alignment: isRtlText ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Text(
+                        widget.message.text,
+                        textAlign: isRtlText ? TextAlign.right : TextAlign.left,
+                        style: widget.platformTheme.messageStyle.copyWith(
+                          color: widget.isSender ? widget.platformTheme.senderText : widget.platformTheme.receiverText,
+                        ),
+                        textDirection: isRtlText ? TextDirection.rtl : TextDirection.ltr,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Align(
+                      alignment: isArabicLocale ? Alignment.centerLeft : Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        textDirection: TextDirection.ltr,
+                        children: [
+                          if (isArabicLocale && widget.isSender) ...[
+                            _StatusTick(
+                              status: widget.message.status,
+                              platformTheme: widget.platformTheme,
+                              forceSentTick: widget.isBlockedMe,
+                            ),
+                            const SizedBox(width: 3),
+                          ],
+                          Text(
+                            widget.message.formattedTime,
+                            style: TextStyle(fontSize: 10.5, color: timeColor),
+                          ),
+                          if (!isArabicLocale && widget.isSender) ...[
+                            const SizedBox(width: 3),
+                            _StatusTick(
+                              status: widget.message.status,
+                              platformTheme: widget.platformTheme,
+                              forceSentTick: widget.isBlockedMe,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(innerRadius),
       child: Container(
@@ -1169,22 +1304,11 @@ class _ImageContentState extends State<_ImageContent> {
           mainAxisSize: MainAxisSize.min,
           children: [
             imageWidget,
-            if (hasCaption)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
-                child: Text(
-                  widget.message.text,
-                  style: widget.platformTheme.messageStyle.copyWith(
-                    color: widget.isSender ? widget.platformTheme.senderText : widget.platformTheme.receiverText,
-                  ),
-                ),
-              ),
-            // Timestamp row (only if we did not overlay it, and platform is NOT messenger/instagram)
             if (!shouldOverlayTimestamp &&
                 widget.platform != Platform.messenger &&
                 widget.platform != Platform.instagram)
               Padding(
-                padding: EdgeInsets.fromLTRB(10, hasCaption ? 0 : 6, 10, 6),
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1507,19 +1631,32 @@ class _AudioPlayerWidgetState extends State<_AudioPlayerWidget> {
                           _formatDuration(total - _currentPosition),
                           style: TextStyle(color: textColor.withOpacity(0.55), fontSize: 10.5),
                         ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(widget.message.formattedTime, style: widget.platformTheme.timestampStyle),
-                            if (widget.isSender) ...[
-                              const SizedBox(width: 4),
-                              _StatusTick(
-                                status: widget.message.status,
-                                platformTheme: widget.platformTheme,
-                                forceSentTick: widget.isBlockedMe,
-                              ),
-                            ],
-                          ],
+                        Builder(
+                          builder: (context) {
+                            final isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isArabicLocale && widget.isSender) ...[
+                                  _StatusTick(
+                                    status: widget.message.status,
+                                    platformTheme: widget.platformTheme,
+                                    forceSentTick: widget.isBlockedMe,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(widget.message.formattedTime, style: widget.platformTheme.timestampStyle),
+                                if (!isArabicLocale && widget.isSender) ...[
+                                  const SizedBox(width: 4),
+                                  _StatusTick(
+                                    status: widget.message.status,
+                                    platformTheme: widget.platformTheme,
+                                    forceSentTick: widget.isBlockedMe,
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -1673,19 +1810,32 @@ class _AudioPlayerWidgetState extends State<_AudioPlayerWidget> {
                           '${widget.message.fileSize ?? '1.2 MB'} • ${_formatDuration(_currentPosition)}',
                           style: TextStyle(color: textColor.withOpacity(0.55), fontSize: 10),
                         ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(widget.message.formattedTime, style: widget.platformTheme.timestampStyle),
-                            if (widget.isSender) ...[
-                              const SizedBox(width: 4),
-                              _StatusTick(
-                                status: widget.message.status,
-                                platformTheme: widget.platformTheme,
-                                forceSentTick: widget.isBlockedMe,
-                              ),
-                            ],
-                          ],
+                        Builder(
+                          builder: (context) {
+                            final isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isArabicLocale && widget.isSender) ...[
+                                  _StatusTick(
+                                    status: widget.message.status,
+                                    platformTheme: widget.platformTheme,
+                                    forceSentTick: widget.isBlockedMe,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(widget.message.formattedTime, style: widget.platformTheme.timestampStyle),
+                                if (!isArabicLocale && widget.isSender) ...[
+                                  const SizedBox(width: 4),
+                                  _StatusTick(
+                                    status: widget.message.status,
+                                    platformTheme: widget.platformTheme,
+                                    forceSentTick: widget.isBlockedMe,
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -2196,6 +2346,8 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
         bubbleWidth = maxBubbleHeight * clampedAr;
       }
 
+      final bool isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+      final bool isRtlText = _isArabic(widget.message.text);
       final bool hasCaption = widget.message.text.isNotEmpty;
       final bool shouldOverlayTimestamp = isWhatsApp && !hasCaption;
 
@@ -2260,10 +2412,11 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
               ),
             ),
 
-            // Duration badge in bottom corner
+            // Duration badge in bottom corner (moves to right in AR mode)
             Positioned(
               bottom: 8,
-              left: 8,
+              left: isArabicLocale ? null : 8,
+              right: isArabicLocale ? 8 : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
@@ -2277,11 +2430,12 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
               ),
             ),
 
-            // Timestamp and ticks badge overlayed ONLY if we should overlay
+            // Timestamp and ticks badge overlayed (moves to left in AR mode, right in EN mode)
             if (shouldOverlayTimestamp)
               Positioned(
                 bottom: 8,
-                right: 8,
+                left: isArabicLocale ? 8 : null,
+                right: isArabicLocale ? null : 8,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
@@ -2290,12 +2444,30 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
+                    textDirection: TextDirection.ltr,
                     children: [
+                      if (isArabicLocale && widget.message.isOneTime) ...[
+                        _ViewOnceDottedCircleIcon(
+                          isOpened: widget.message.isOneTimeOpened,
+                          color: Colors.white,
+                          size: 14.0,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (isArabicLocale && widget.isSender) ...[
+                        _StatusTick(
+                          status: widget.message.status,
+                          platformTheme: widget.platformTheme,
+                          forceSentTick: widget.isBlockedMe,
+                          colorOverride: const Color(0xFF34B7F1), // blue ticks on media overlay
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       Text(
                         widget.message.formattedTime,
                         style: const TextStyle(color: Colors.white, fontSize: 10),
                       ),
-                      if (widget.isSender) ...[
+                      if (!isArabicLocale && widget.isSender) ...[
                         const SizedBox(width: 4),
                         _StatusTick(
                           status: widget.message.status,
@@ -2332,17 +2504,22 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
         child: Container(
           width: bubbleWidth,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
               videoBody,
               if (hasCaption)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
-                  child: Text(
-                    widget.message.text,
-                    style: widget.platformTheme.messageStyle.copyWith(
-                      color: widget.isSender ? widget.platformTheme.senderText : widget.platformTheme.receiverText,
+                  child: Align(
+                    alignment: isRtlText ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Text(
+                      widget.message.text,
+                      textAlign: isRtlText ? TextAlign.right : TextAlign.left,
+                      textDirection: isRtlText ? TextDirection.rtl : TextDirection.ltr,
+                      style: widget.platformTheme.messageStyle.copyWith(
+                        color: widget.isSender ? widget.platformTheme.senderText : widget.platformTheme.receiverText,
+                      ),
                     ),
                   ),
                 ),
@@ -2352,22 +2529,34 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
                   widget.platform != Platform.instagram)
                 Padding(
                   padding: EdgeInsets.fromLTRB(10, hasCaption ? 0 : 6, 10, 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.message.formattedTime,
-                        style: widget.platformTheme.timestampStyle,
-                      ),
-                      if (widget.platform == Platform.whatsapp && widget.isSender) ...[
-                        const SizedBox(width: 4),
-                        _StatusTick(
-                          status: widget.message.status,
-                          platformTheme: widget.platformTheme,
-                          forceSentTick: widget.isBlockedMe,
+                  child: Align(
+                    alignment: isArabicLocale ? Alignment.centerLeft : Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      textDirection: TextDirection.ltr,
+                      children: [
+                        if (isArabicLocale && widget.platform == Platform.whatsapp && widget.isSender) ...[
+                          _StatusTick(
+                            status: widget.message.status,
+                            platformTheme: widget.platformTheme,
+                            forceSentTick: widget.isBlockedMe,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          widget.message.formattedTime,
+                          style: widget.platformTheme.timestampStyle,
                         ),
+                        if (!isArabicLocale && widget.platform == Platform.whatsapp && widget.isSender) ...[
+                          const SizedBox(width: 4),
+                          _StatusTick(
+                            status: widget.message.status,
+                            platformTheme: widget.platformTheme,
+                            forceSentTick: widget.isBlockedMe,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
             ],
@@ -3227,5 +3416,598 @@ String _getMessengerReplyLabel(bool isSender, String repliedToSenderName, String
       return isArabic ? 'لقد قام $name بالرد على نفسه' : '$name replied to themselves';
     }
   }
+}
+
+class _StickerContent extends StatelessWidget {
+  final ChatMessage message;
+  final bool isSender;
+  final Platform platform;
+  final PlatformTheme platformTheme;
+
+  const _StickerContent({
+    required this.message,
+    required this.isSender,
+    required this.platform,
+    required this.platformTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget stickerWidget;
+    if (message.imageBytes != null && message.imageBytes!.isNotEmpty) {
+      stickerWidget = Image.memory(
+        message.imageBytes!,
+        width: 140,
+        height: 140,
+        fit: BoxFit.contain,
+      );
+    } else {
+      stickerWidget = const Icon(Icons.sticky_note_2_rounded, size: 100, color: Colors.orangeAccent);
+    }
+
+    if (platform == Platform.whatsapp) {
+      final isDark = platformTheme.chatBg == const Color(0xFF0B141A);
+      final timeColor = isDark ? Colors.white60 : Colors.black54;
+
+      return Container(
+        padding: const EdgeInsets.all(4),
+        child: Column(
+          crossAxisAlignment: isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            stickerWidget,
+            const SizedBox(height: 2),
+            Builder(
+              builder: (context) {
+                final isArabicLocale = Provider.of<ThemeProvider>(context).isArabic;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isArabicLocale && isSender) ...[
+                      _StatusTick(status: message.status, platformTheme: platformTheme),
+                      const SizedBox(width: 3),
+                    ],
+                    Text(
+                      message.formattedTime,
+                      style: TextStyle(fontSize: 10.5, color: timeColor),
+                    ),
+                    if (!isArabicLocale && isSender) ...[
+                      const SizedBox(width: 3),
+                      _StatusTick(status: message.status, platformTheme: platformTheme),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: stickerWidget,
+    );
+  }
+}
+
+class _ViewOnceDottedCircleIcon extends StatelessWidget {
+  final bool isOpened;
+  final Color color;
+  final double size;
+
+  const _ViewOnceDottedCircleIcon({
+    required this.isOpened,
+    required this.color,
+    this.size = 22.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _DottedCirclePainter(isOpened: isOpened, color: color),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: isOpened
+              ? const SizedBox.shrink()
+              : Text(
+                  '1',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: size * 0.52,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DottedCirclePainter extends CustomPainter {
+  final bool isOpened;
+  final Color color;
+
+  _DottedCirclePainter({required this.isOpened, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - 3) / 2;
+
+    final solidPaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final dotPaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.fill;
+
+    // Solid arc covering about 180 degrees (from top-right to bottom-right)
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -1.4,
+      3.14,
+      false,
+      solidPaint,
+    );
+
+    // Dotted dots covering the remaining ~180 degrees (left side)
+    const int dotCount = 5;
+    const double startAngle = 1.74;
+    const double totalSweep = 3.14;
+    for (int i = 0; i < dotCount; i++) {
+      final double angle = startAngle + (totalSweep / (dotCount - 1)) * i;
+      final double x = center.dx + radius * math.cos(angle);
+      final double y = center.dy + radius * math.sin(angle);
+      canvas.drawCircle(Offset(x, y), 1.1, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DottedCirclePainter oldDelegate) {
+    return oldDelegate.isOpened != isOpened || oldDelegate.color != color;
+  }
+}
+
+class _DeletedMessageContent extends StatelessWidget {
+  final ChatMessage message;
+  final bool isSender;
+  final Platform platform;
+  final PlatformTheme platformTheme;
+  final String contactName;
+
+  const _DeletedMessageContent({
+    required this.message,
+    required this.isSender,
+    required this.platform,
+    required this.platformTheme,
+    required this.contactName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Provider.of<ThemeProvider>(context).isArabic;
+    final textColor = isSender ? platformTheme.senderText : platformTheme.receiverText;
+    final mutedColor = textColor.withValues(alpha: 0.55);
+
+    final deletedText = message.deletedPreviewText(platform, contactName, isArabic);
+    IconData iconData;
+    switch (platform) {
+      case Platform.whatsapp:
+        iconData = Icons.do_not_disturb_alt_rounded;
+        break;
+      case Platform.messenger:
+        iconData = Icons.remove_circle_outline_rounded;
+        break;
+      case Platform.instagram:
+        iconData = Icons.info_outline_rounded;
+        break;
+      case Platform.snapchat:
+        iconData = Icons.chat_bubble_outline_rounded;
+        break;
+    }
+
+    if (platform == Platform.whatsapp) {
+      final isDark = platformTheme.chatBg == const Color(0xFF0B141A);
+      final timeColor = isDark ? Colors.white60 : Colors.black54;
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          textDirection: TextDirection.ltr,
+          children: [
+            if (isArabic) ...[
+              Text(
+                message.formattedTime,
+                style: TextStyle(fontSize: 10.5, color: timeColor),
+              ),
+              const SizedBox(width: 14),
+              Flexible(
+                child: Text(
+                  deletedText,
+                  style: TextStyle(
+                    color: mutedColor,
+                    fontSize: 13.5,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(iconData, size: 19, color: mutedColor),
+            ] else ...[
+              Icon(iconData, size: 19, color: mutedColor),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  deletedText,
+                  style: TextStyle(
+                    color: mutedColor,
+                    fontSize: 13.5,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                message.formattedTime,
+                style: TextStyle(fontSize: 10.5, color: timeColor),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        textDirection: TextDirection.ltr,
+        children: [
+          if (isArabic) ...[
+            Flexible(
+              child: Text(
+                deletedText,
+                style: TextStyle(
+                  color: mutedColor,
+                  fontSize: 13.5,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(iconData, size: 21, color: mutedColor),
+          ] else ...[
+            Icon(iconData, size: 21, color: mutedColor),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                deletedText,
+                style: TextStyle(
+                  color: mutedColor,
+                  fontSize: 13.5,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _OneTimeContent extends StatelessWidget {
+  final ChatMessage message;
+  final bool isSender;
+  final Platform platform;
+  final PlatformTheme platformTheme;
+
+  const _OneTimeContent({
+    required this.message,
+    required this.isSender,
+    required this.platform,
+    required this.platformTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Provider.of<ThemeProvider>(context).isArabic;
+    final isOpened = message.isOneTimeOpened;
+    final textColor = isSender ? platformTheme.senderText : platformTheme.receiverText;
+    final mutedColor = textColor.withValues(alpha: 0.55);
+
+    if (platform == Platform.whatsapp) {
+      final isDark = platformTheme.chatBg == const Color(0xFF0B141A);
+      final timeColor = isDark ? Colors.white60 : Colors.black54;
+      final accentGreen = isDark ? const Color(0xFF00A884) : const Color(0xFF008069);
+      final iconColor = isOpened ? mutedColor : (isSender ? textColor : accentGreen);
+
+      final titleText = (!isOpened && message.text.isNotEmpty)
+          ? message.text
+          : message.oneTimePreviewText(platform, isArabic);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          textDirection: TextDirection.ltr,
+          children: [
+            if (isArabic) ...[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                textDirection: TextDirection.ltr,
+                children: [
+                  if (isSender) ...[
+                    _StatusTick(status: message.status, platformTheme: platformTheme),
+                    const SizedBox(width: 3),
+                  ],
+                  Text(
+                    message.formattedTime,
+                    style: TextStyle(fontSize: 10.5, color: timeColor),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 6),
+              _ViewOnceDottedCircleIcon(
+                isOpened: isOpened,
+                color: iconColor,
+                size: 20.0,
+              ),
+            ] else ...[
+              _ViewOnceDottedCircleIcon(
+                isOpened: isOpened,
+                color: iconColor,
+                size: 20.0,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                textDirection: TextDirection.ltr,
+                children: [
+                  Text(
+                    message.formattedTime,
+                    style: TextStyle(fontSize: 10.5, color: timeColor),
+                  ),
+                  if (isSender) ...[
+                    const SizedBox(width: 3),
+                    _StatusTick(status: message.status, platformTheme: platformTheme),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        ),
+      );
+    } else if (platform == Platform.instagram) {
+      final isVideo = message.type == MessageType.video;
+      final titleText = message.oneTimePreviewText(platform, isArabic);
+      IconData iconData;
+      if (isOpened) {
+        iconData = Icons.panorama_fish_eye_rounded;
+      } else {
+        iconData = isVideo ? Icons.videocam_outlined : Icons.camera_alt_outlined;
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          textDirection: TextDirection.ltr,
+          children: [
+            if (isArabic) ...[
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(iconData, size: 18, color: isOpened ? mutedColor : textColor),
+            ] else ...[
+              Icon(iconData, size: 18, color: isOpened ? mutedColor : textColor),
+              const SizedBox(width: 8),
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    } else if (platform == Platform.snapchat) {
+      // Real Snapchat convention: square = received, triangle = sent;
+      // solid = unopened, hollow = opened; red = silent (photo), purple = has audio (video/voice note).
+      final hasAudio = message.type == MessageType.video || message.type == MessageType.audio;
+      final snapColor = hasAudio ? const Color(0xFF9B51E0) : const Color(0xFFFF2A4B);
+      final titleText = message.oneTimePreviewText(platform, isArabic);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          textDirection: TextDirection.ltr,
+          children: [
+            if (isArabic) ...[
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 10),
+              _SnapIndicatorIcon(
+                isSent: isSender,
+                isOpened: isOpened,
+                color: isOpened ? mutedColor : snapColor,
+              ),
+            ] else ...[
+              _SnapIndicatorIcon(
+                isSent: isSender,
+                isOpened: isOpened,
+                color: isOpened ? mutedColor : snapColor,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    } else {
+      // Messenger - view once photo/video (voice notes aren't view-once on Messenger)
+      final isVideo = message.type == MessageType.video;
+      final titleText = message.oneTimePreviewText(platform, isArabic);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          textDirection: TextDirection.ltr,
+          children: [
+            if (isArabic) ...[
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                isOpened ? Icons.panorama_fish_eye_rounded : (isVideo ? Icons.videocam_outlined : Icons.photo_camera_outlined),
+                size: 18,
+                color: isOpened ? mutedColor : textColor,
+              ),
+            ] else ...[
+              Icon(
+                isOpened ? Icons.panorama_fish_eye_rounded : (isVideo ? Icons.videocam_outlined : Icons.photo_camera_outlined),
+                size: 18,
+                color: isOpened ? mutedColor : textColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                titleText,
+                style: TextStyle(
+                  color: isOpened ? mutedColor : textColor,
+                  fontSize: 14,
+                  fontWeight: isOpened ? FontWeight.normal : FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+  }
+}
+
+/// Snapchat-accurate indicator: square for received content, triangle
+/// (pointing up) for sent content; filled = unopened, outlined = opened.
+class _SnapIndicatorIcon extends StatelessWidget {
+  final bool isSent;
+  final bool isOpened;
+  final Color color;
+
+  const _SnapIndicatorIcon({
+    required this.isSent,
+    required this.isOpened,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const double size = 16;
+    if (!isSent) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: isOpened ? Colors.transparent : color,
+          borderRadius: BorderRadius.circular(3),
+          border: Border.all(color: color, width: 2),
+        ),
+      );
+    }
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _SnapTrianglePainter(color: color, filled: !isOpened),
+    );
+  }
+}
+
+class _SnapTrianglePainter extends CustomPainter {
+  final Color color;
+  final bool filled;
+
+  _SnapTrianglePainter({required this.color, required this.filled});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    if (filled) {
+      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+    } else {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SnapTrianglePainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.filled != filled;
 }
 

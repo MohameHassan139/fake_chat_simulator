@@ -682,12 +682,19 @@ class _PlatformSwitcher extends StatelessWidget {
 
   void _showPlatformPicker(BuildContext context) {
     final chatProvider = context.read<ChatProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final isAr = context.read<ThemeProvider>().isArabic;
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Switch Platform', style: TextStyle(color: Colors.white)),
+        title: Text(
+          LanguageHelper.translate('switch_platform', isAr),
+          style: TextStyle(color: textColor),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: Platform.values.map((p) {
@@ -695,7 +702,7 @@ class _PlatformSwitcher extends StatelessWidget {
             return ListTile(
               leading: Icon(_icon(p), color: _color(p)),
               title: Text(_name(p), style: TextStyle(
-                color: isActive ? _color(p) : Colors.white,
+                color: isActive ? _color(p) : textColor,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
               )),
               trailing: isActive ? const Icon(Icons.check_rounded, color: Color(0xFF6C63FF)) : null,

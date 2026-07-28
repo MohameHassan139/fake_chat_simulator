@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
+import '../providers/theme_provider.dart';
 import '../themes/platform_themes.dart';
+import '../utils/language_helper.dart';
 
 class ContactEditorSheet extends StatefulWidget {
   const ContactEditorSheet({super.key});
@@ -82,14 +84,19 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
     final contact = context.watch<ChatProvider>().activeSession?.contactUser;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final chatProvider = context.watch<ChatProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final isAr = themeProvider.isArabic;
     final session = chatProvider.activeSession;
     final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
     final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final labelColor = isDark ? Colors.white38 : Colors.black45;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
       child: SingleChildScrollView(
@@ -103,15 +110,15 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: isDark ? Colors.white24 : Colors.black12,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Edit Contact',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+            Text(
+              LanguageHelper.translate('edit_contact', isAr),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textColor),
             ),
             const SizedBox(height: 20),
 
@@ -149,7 +156,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                         decoration: BoxDecoration(
                           color: accentColor,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1A1A1A), width: 2),
+                          border: Border.all(color: isDark ? const Color(0xFF1A1A1A) : Colors.white, width: 2),
                         ),
                         child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
                       ),
@@ -161,20 +168,20 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
             const SizedBox(height: 20),
 
             // Name field
-            _Label('Display Name'),
+            _Label(LanguageHelper.translate('display_name', isAr)),
             const SizedBox(height: 6),
             TextField(
               controller: _nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: 'Contact name',
-                prefixIcon: Icon(Icons.person_outline, color: Colors.white38),
+              style: TextStyle(color: textColor),
+              decoration: InputDecoration(
+                hintText: LanguageHelper.translate('contact_name', isAr),
+                prefixIcon: Icon(Icons.person_outline, color: labelColor),
               ),
             ),
             const SizedBox(height: 16),
 
             // Online status
-            _Label('Online Status'),
+            _Label(LanguageHelper.translate('online_status', isAr)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -183,7 +190,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                 if (s == UserOnlineStatus.typing) return const SizedBox.shrink();
                 final isActive = _onlineStatus == s && !_isTyping;
                 return _StatusChip(
-                  label: _statusLabel(s),
+                  label: _statusLabel(s, isAr),
                   isActive: isActive,
                   onTap: () => setState(() {
                     _onlineStatus = s;
@@ -196,28 +203,28 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
 
             // Typing toggle
             _ToggleRow(
-              label: 'Show Typing Indicator',
+              label: LanguageHelper.translate('show_typing_indicator', isAr),
               value: _isTyping,
               onChanged: (v) => setState(() => _isTyping = v),
             ),
 
             // Block toggle
             _ToggleRow(
-              label: 'Block Contact',
+              label: LanguageHelper.translate('block_contact', isAr),
               value: _isBlocked,
               onChanged: (v) => setState(() => _isBlocked = v),
             ),
 
             // Blocked Me toggle
             _ToggleRow(
-              label: 'Contact Blocked Me',
+              label: LanguageHelper.translate('contact_blocked_me', isAr),
               value: _isBlockedMe,
               onChanged: (v) => setState(() => _isBlockedMe = v),
             ),
 
             // Disappearing Messages toggle
             _ToggleRow(
-              label: 'Disappearing Messages (Timer)',
+              label: LanguageHelper.translate('disappearing_messages', isAr),
               value: _isDisappearing,
               onChanged: (v) => setState(() => _isDisappearing = v),
             ),
@@ -225,7 +232,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
             // Last seen (only when offline)
             if (_onlineStatus == UserOnlineStatus.offline || _onlineStatus == UserOnlineStatus.lastSeen) ...[
               const SizedBox(height: 16),
-              _Label('Last Seen'),
+              _Label(LanguageHelper.translate('last_seen', isAr)),
               const SizedBox(height: 8),
               GestureDetector(
                 onTap: () async {
@@ -235,17 +242,17 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF242424),
+                    color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.access_time, color: Colors.white38, size: 18),
+                      Icon(Icons.access_time, color: labelColor, size: 18),
                       const SizedBox(width: 10),
                       Text(
-                        _lastSeen != null ? _formatDt(_lastSeen!) : 'Tap to set last seen time',
+                        _lastSeen != null ? _formatDt(_lastSeen!) : LanguageHelper.translate('tap_to_set_last_seen', isAr),
                         style: TextStyle(
-                          color: _lastSeen != null ? Colors.white : Colors.white38,
+                          color: _lastSeen != null ? textColor : labelColor,
                           fontSize: 14,
                         ),
                       ),
@@ -266,7 +273,7 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: _save,
-                child: const Text('Save Contact', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                child: Text(LanguageHelper.translate('save_contact', isAr), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -275,12 +282,12 @@ class _ContactEditorSheetState extends State<ContactEditorSheet> {
     );
   }
 
-  String _statusLabel(UserOnlineStatus s) {
+  String _statusLabel(UserOnlineStatus s, bool isAr) {
     switch (s) {
-      case UserOnlineStatus.online: return 'Online';
-      case UserOnlineStatus.offline: return 'Offline';
-      case UserOnlineStatus.lastSeen: return 'Last Seen';
-      case UserOnlineStatus.typing: return 'Typing';
+      case UserOnlineStatus.online: return LanguageHelper.translate('status_online', isAr);
+      case UserOnlineStatus.offline: return LanguageHelper.translate('status_offline', isAr);
+      case UserOnlineStatus.lastSeen: return LanguageHelper.translate('status_last_seen', isAr);
+      case UserOnlineStatus.typing: return LanguageHelper.translate('status_typing', isAr);
     }
   }
 
@@ -314,9 +321,15 @@ class _Label extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(
       text,
-      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white38, letterSpacing: 0.5),
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: isDark ? Colors.white38 : Colors.black45,
+        letterSpacing: 0.5,
+      ),
     );
   }
 }
@@ -334,6 +347,7 @@ class _StatusChip extends StatelessWidget {
     final session = chatProvider.activeSession;
     final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
     final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: onTap,
@@ -341,7 +355,9 @@ class _StatusChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? accentColor.withValues(alpha: 0.2) : const Color(0xFF242424),
+          color: isActive
+              ? accentColor.withValues(alpha: 0.2)
+              : (isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive ? accentColor : Colors.transparent,
@@ -350,7 +366,7 @@ class _StatusChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? accentColor : Colors.white54,
+            color: isActive ? accentColor : (isDark ? Colors.white54 : Colors.black54),
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
             fontSize: 13,
           ),
@@ -373,11 +389,12 @@ class _ToggleRow extends StatelessWidget {
     final session = chatProvider.activeSession;
     final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
     final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Row(
       children: [
         Expanded(
-          child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          child: Text(label, style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 14)),
         ),
         Switch(
           value: value,

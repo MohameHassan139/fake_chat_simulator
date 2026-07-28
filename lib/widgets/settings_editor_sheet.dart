@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
+import '../providers/theme_provider.dart';
 import '../models/chat_models.dart';
 import '../themes/platform_themes.dart';
+import '../utils/language_helper.dart';
 
 class SettingsEditorSheet extends StatefulWidget {
   const SettingsEditorSheet({super.key});
@@ -132,17 +134,25 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final chatProvider = context.watch<ChatProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final isAr = themeProvider.isArabic;
     final session = chatProvider.activeSession;
     final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
     final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final labelColor = isDark ? Colors.white38 : Colors.black45;
+    final textSecColor = isDark ? Colors.white70 : Colors.black54;
+    final dividerColor = isDark ? Colors.white10 : Colors.black12;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
       child: SingleChildScrollView(
@@ -155,20 +165,20 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: isDark ? Colors.white24 : Colors.black12,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Mock Mockup Settings',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+            Text(
+              LanguageHelper.translate('mock_mockup_settings', isAr),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textColor),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Customize mock status bar, dark mode, and user bios',
-              style: TextStyle(color: Colors.white38, fontSize: 13),
+            Text(
+              LanguageHelper.translate('customize_mock_status', isAr),
+              style: TextStyle(color: labelColor, fontSize: 13),
             ),
             const SizedBox(height: 24),
 
@@ -176,17 +186,17 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF242424),
+                color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.dark_mode_rounded, color: Colors.amber, size: 22),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Mock Dark Mode',
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                      LanguageHelper.translate('mock_dark_mode', isAr),
+                      style: TextStyle(color: textColor, fontSize: 15, fontWeight: FontWeight.w600),
                     ),
                   ),
                   Switch(
@@ -200,15 +210,15 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
             const SizedBox(height: 20),
 
             // Clock time
-            _SectionLabel('Clock Time'),
+            _SectionLabel(LanguageHelper.translate('clock_time', isAr)),
             const SizedBox(height: 8),
             TextField(
               controller: _timeController,
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+              style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: '9:41',
-                prefixIcon: Icon(Icons.access_time, color: Colors.white38),
+                prefixIcon: Icon(Icons.access_time, color: labelColor),
               ),
             ),
             const SizedBox(height: 8),
@@ -223,10 +233,10 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF242424),
+                      color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(t, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                    child: Text(t, style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 13)),
                   ),
                 );
               }).toList(),
@@ -234,32 +244,32 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
             const SizedBox(height: 20),
 
             // First-Time Profile Header Info
-            _SectionLabel('Profile Header Bio'),
+            _SectionLabel(LanguageHelper.translate('profile_header_bio', isAr)),
             const SizedBox(height: 8),
             TextField(
               controller: _bioController,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: const InputDecoration(
+              style: TextStyle(color: textColor, fontSize: 14),
+              decoration: InputDecoration(
                 hintText: 'e.g., 1.2M followers • 215 posts',
-                prefixIcon: Icon(Icons.info_outline, color: Colors.white38),
+                prefixIcon: Icon(Icons.info_outline, color: labelColor),
               ),
             ),
             const SizedBox(height: 16),
 
-            _SectionLabel('Profile Header Sub-Bio / Stats'),
+            _SectionLabel(LanguageHelper.translate('profile_header_sub_bio', isAr)),
             const SizedBox(height: 8),
             TextField(
               controller: _subBioController,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: const InputDecoration(
+              style: TextStyle(color: textColor, fontSize: 14),
+              decoration: InputDecoration(
                 hintText: "e.g., You're friends on Facebook",
-                prefixIcon: Icon(Icons.people_outline, color: Colors.white38),
+                prefixIcon: Icon(Icons.people_outline, color: labelColor),
               ),
             ),
             const SizedBox(height: 20),
 
             // Battery level
-            _SectionLabel('Battery Level: $_battery%'),
+            _SectionLabel('${LanguageHelper.translate('battery_level', isAr)}: $_battery%'),
             Slider(
               value: _battery.toDouble(),
               min: 5,
@@ -274,7 +284,7 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                 final val = int.parse(label.replaceAll('%', ''));
                 return GestureDetector(
                   onTap: () => setState(() => _battery = val),
-                  child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                  child: Text(label, style: TextStyle(color: labelColor, fontSize: 12)),
                 );
               }).toList(),
             ),
@@ -284,17 +294,17 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF242424),
+                color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.wifi_rounded, color: Colors.white54, size: 22),
+                  Icon(Icons.wifi_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 22),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Show WiFi Icon',
-                      style: TextStyle(color: Colors.white, fontSize: 15),
+                      LanguageHelper.translate('show_wifi_icon', isAr),
+                      style: TextStyle(color: textColor, fontSize: 15),
                     ),
                   ),
                   Switch(
@@ -306,12 +316,12 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
               ),
             ),
             const SizedBox(height: 24),
-            _SectionLabel('INBOX FEED CONTROLS'),
+            _SectionLabel(LanguageHelper.translate('inbox_feed_controls', isAr)),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF242424),
+                color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -322,10 +332,10 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                     children: [
                       const Icon(Icons.circle, color: Color(0xFF31A24C), size: 18),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Contact is Online',
-                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          LanguageHelper.translate('contact_is_online', isAr),
+                          style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
                       Switch(
@@ -335,17 +345,17 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                       ),
                     ],
                   ),
-                  const Divider(color: Colors.white10, height: 24),
+                  Divider(color: dividerColor, height: 24),
 
                   // Group Chat Switch Toggle
                   Row(
                     children: [
                       const Icon(Icons.groups_rounded, color: Colors.blueAccent, size: 22),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Is Group Chat',
-                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          LanguageHelper.translate('is_group_chat', isAr),
+                          style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
                       Switch(
@@ -357,107 +367,107 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                   ),
                   if (_isGroup) ...[
                     const SizedBox(height: 12),
-                    const Text(
-                      'Group Members (Description)',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    Text(
+                      LanguageHelper.translate('group_members_desc', isAr),
+                      style: TextStyle(color: textSecColor, fontSize: 12),
                     ),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _groupMembersController,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      decoration: const InputDecoration(
-                        hintText: 'e.g., Sarah, Elon, Dev, You',
-                        prefixIcon: Icon(Icons.people, color: Colors.white38),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      style: TextStyle(color: textColor, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Sarah, Elon, Dev, You',
+                        prefixIcon: Icon(Icons.people, color: labelColor),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
                   ],
-                  const Divider(color: Colors.white10, height: 24),
+                  Divider(color: dividerColor, height: 24),
 
                   // Unread Badge Count
-                  const Text(
-                    'Unread Messages Count',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  Text(
+                    LanguageHelper.translate('unread_messages_count', isAr),
+                    style: TextStyle(color: textSecColor, fontSize: 12),
                   ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _unreadCountController,
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: textColor, fontSize: 14),
+                    decoration: InputDecoration(
                       hintText: 'e.g., 3 (Leave empty for 0)',
-                      prefixIcon: Icon(Icons.mark_chat_unread_rounded, color: Colors.white38),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      prefixIcon: Icon(Icons.mark_chat_unread_rounded, color: labelColor),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
-                  const Divider(color: Colors.white10, height: 24),
+                  Divider(color: dividerColor, height: 24),
 
                   // Last message text override
-                  const Text(
-                    'Override Last Message Preview',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  Text(
+                    LanguageHelper.translate('override_last_msg_preview', isAr),
+                    style: TextStyle(color: textSecColor, fontSize: 12),
                   ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _lastMsgController,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: textColor, fontSize: 14),
+                    decoration: InputDecoration(
                       hintText: 'Custom last message text',
-                      prefixIcon: Icon(Icons.history_edu_rounded, color: Colors.white38),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      prefixIcon: Icon(Icons.history_edu_rounded, color: labelColor),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   // Last message time override
-                  const Text(
-                    'Override Last Message Time',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  Text(
+                    LanguageHelper.translate('override_last_msg_time', isAr),
+                    style: TextStyle(color: textSecColor, fontSize: 12),
                   ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _lastMsgTimeController,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: textColor, fontSize: 14),
+                    decoration: InputDecoration(
                       hintText: 'e.g., Just now, Yesterday, 2h, 3:15 PM',
-                      prefixIcon: Icon(Icons.watch_later_rounded, color: Colors.white38),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      prefixIcon: Icon(Icons.watch_later_rounded, color: labelColor),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
-                  const Divider(color: Colors.white10, height: 24),
+                  Divider(color: dividerColor, height: 24),
 
                   // Who sent the last message
-                  const Text(
-                    'Who Sent Last Message?',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  Text(
+                    LanguageHelper.translate('who_sent_last_msg', isAr),
+                    style: TextStyle(color: textSecColor, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white12),
+                      border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: _lastMsgSenderVal,
-                        dropdownColor: const Color(0xFF1E1E1E),
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
+                        dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        style: TextStyle(color: textColor, fontSize: 14),
+                        icon: Icon(Icons.arrow_drop_down, color: isDark ? Colors.white54 : Colors.black54),
                         isExpanded: true,
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: 'default',
-                            child: Text('Default (Use actual message sender)'),
+                            child: Text(LanguageHelper.translate('default_actual_sender', isAr)),
                           ),
                           DropdownMenuItem(
                             value: 'me',
-                            child: Text('Me (Sender / Double ticks)'),
+                            child: Text(LanguageHelper.translate('me_sender_ticks', isAr)),
                           ),
                           DropdownMenuItem(
                             value: 'them',
-                            child: Text('Them (Contact / Received)'),
+                            child: Text(LanguageHelper.translate('them_contact_received', isAr)),
                           ),
                         ],
                         onChanged: (val) {
@@ -483,9 +493,9 @@ class _SettingsEditorSheetState extends State<SettingsEditorSheet> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: _save,
-                child: const Text(
-                  'Apply Mockup Settings',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                child: Text(
+                  LanguageHelper.translate('apply_settings', isAr),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -508,12 +518,13 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: Colors.white38,
+        color: isDark ? Colors.white38 : Colors.black45,
         letterSpacing: 0.5,
       ),
     );

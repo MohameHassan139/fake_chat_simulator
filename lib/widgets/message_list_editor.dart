@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
+import '../providers/theme_provider.dart';
 import '../themes/platform_themes.dart';
+import '../utils/language_helper.dart';
 import '../widgets/message_bubble.dart';
 import 'message_editor_sheet.dart';
 
@@ -15,6 +17,7 @@ class MessageListEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     final chatProvider = context.watch<ChatProvider>();
     final session = chatProvider.activeSession;
+    final isAr = context.watch<ThemeProvider>().isArabic;
     if (session == null) return const SizedBox.shrink();
 
     final platformTheme = PlatformTheme.of(session.platform);
@@ -26,11 +29,11 @@ class MessageListEditor extends StatelessWidget {
           children: [
             const Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.white12),
             const SizedBox(height: 12),
-            const Text('No messages yet', style: TextStyle(color: Colors.white24)),
+            Text(LanguageHelper.translate('no_messages_yet', isAr), style: const TextStyle(color: Colors.white24)),
             const SizedBox(height: 8),
-            const Text(
-              'Use the editor below to add messages',
-              style: TextStyle(color: Colors.white12, fontSize: 12),
+            Text(
+              LanguageHelper.translate('use_editor_below', isAr),
+              style: const TextStyle(color: Colors.white12, fontSize: 12),
             ),
           ],
         ),
@@ -181,6 +184,7 @@ class _MessageContextMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = context.watch<ThemeProvider>().isArabic;
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF1A1A1A),
@@ -214,7 +218,7 @@ class _MessageContextMenu extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    message.text.isEmpty ? '[${message.type.name}]' : message.text,
+                    message.text.isEmpty ? (isAr ? '[مكون]' : '[${message.type.name}]') : message.text,
                     style: const TextStyle(color: Colors.white70, fontSize: 14),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -229,7 +233,7 @@ class _MessageContextMenu extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    message.isSender ? 'Me' : 'Them',
+                    message.isSender ? (isAr ? 'أنا' : 'Me') : (isAr ? 'الطرف الآخر' : 'Them'),
                     style: TextStyle(
                       fontSize: 11,
                       color: message.isSender ? const Color(0xFF6C63FF) : const Color(0xFF42A5F5),
@@ -244,26 +248,26 @@ class _MessageContextMenu extends StatelessWidget {
           if (message.type != MessageType.dateDivider)
             _MenuItem(
               icon: Icons.reply_rounded,
-              label: 'Reply to this message',
+              label: LanguageHelper.translate('reply_to_this_message', isAr),
               color: const Color(0xFF4CAF50),
               onTap: onReply,
             ),
           _MenuItem(
             icon: Icons.edit_rounded,
-            label: 'Edit Message',
+            label: LanguageHelper.translate('edit_message', isAr),
             color: const Color(0xFF6C63FF),
             onTap: onEdit,
           ),
           if (message.type != MessageType.dateDivider)
             _MenuItem(
               icon: Icons.swap_horiz_rounded,
-              label: message.isSender ? 'Move to Their side' : 'Move to My side',
+              label: message.isSender ? LanguageHelper.translate('move_to_their_side', isAr) : LanguageHelper.translate('move_to_my_side', isAr),
               color: const Color(0xFF42A5F5),
               onTap: onToggleSide,
             ),
           _MenuItem(
             icon: Icons.delete_rounded,
-            label: 'Delete Message',
+            label: LanguageHelper.translate('delete_message', isAr),
             color: Colors.redAccent,
             onTap: onDelete,
           ),

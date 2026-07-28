@@ -269,7 +269,9 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
             ? s.groupMembers
             : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
         final lastMsgText = s.customLastMessage ??
-            (hasMessages ? s.messages.last.text : defaultLastMsgText);
+            (hasMessages
+                ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)
+                : defaultLastMsgText);
         final lastMsgTime = s.customLastMessageTime ??
             (hasMessages ? s.messages.last.formattedTime : s.fakeTime);
         final isMe =
@@ -1300,7 +1302,9 @@ class _MessengerInbox extends StatelessWidget {
                           ? s.groupMembers
                           : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
                   final lastMsgText = s.customLastMessage ??
-                      (hasMessages ? s.messages.last.text : defaultLastMsgText);
+                      (hasMessages
+                          ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)
+                          : defaultLastMsgText);
                   final lastMsgTime = s.customLastMessageTime ??
                       (hasMessages
                           ? s.messages.last.formattedTime
@@ -1681,7 +1685,9 @@ class _InstagramInbox extends StatelessWidget {
                           ? s.groupMembers
                           : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
                   final lastMsgText = s.customLastMessage ??
-                      (hasMessages ? s.messages.last.text : defaultLastMsgText);
+                      (hasMessages
+                          ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)
+                          : defaultLastMsgText);
                   final lastMsgTime = s.customLastMessageTime ??
                       (hasMessages
                           ? s.messages.last.formattedTime
@@ -2065,13 +2071,16 @@ class _SnapchatInbox extends StatelessWidget {
                           ? s.groupMembers
                           : (isAr ? 'دردشة جديدة' : 'New Chat');
                   final msg = s.customLastMessage ??
-                      (hasMessages ? s.messages.last.text : defaultLastMsgText);
+                      (hasMessages
+                          ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)
+                          : defaultLastMsgText);
 
                   String snapStatus;
-                  final isSnap = msg.toLowerCase().contains('snap') ||
-                      (hasMessages &&
-                          (s.messages.last.type == MessageType.image ||
-                           s.messages.last.type == MessageType.video));
+                  final isSnap = hasMessages &&
+                      !s.messages.last.isDeleted &&
+                      (msg.toLowerCase().contains('snap') ||
+                          s.messages.last.type == MessageType.image ||
+                          s.messages.last.type == MessageType.video);
 
                   if (s.unreadCount > 0) {
                     snapStatus = isSnap

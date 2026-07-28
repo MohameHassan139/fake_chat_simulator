@@ -1,13 +1,55 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../utils/language_helper.dart';
 
 enum Platform { whatsapp, messenger, instagram, snapchat }
 
-enum MessageType { text, image, audio, voiceCall, videoCall, dateDivider, video }
+enum MessageType { text, image, audio, voiceCall, videoCall, dateDivider, video, sticker }
 
 enum MessageStatus { sending, sent, delivered, read }
 
 enum UserOnlineStatus { online, offline, typing, lastSeen }
+
+/// Real-app capability rules for the "Deleted" and "View Once" (one-time)
+/// message features. Kept in one place so the editor UI and the bubble
+/// renderer can never drift apart on what each platform actually supports.
+class MessageFeatureRules {
+  MessageFeatureRules._();
+
+  /// Media types that can be marked "View Once" per platform.
+  /// - WhatsApp: photo, video, voice notes (added Dec 2023).
+  /// - Instagram: photo, video only (camera-captured DM media); voice notes
+  ///   always persist and replay freely.
+  /// - Messenger: photo, video only; voice notes are never one-time.
+  /// - Snapchat: photo, video, and audio notes are all ephemeral-by-default
+  ///   chat content.
+  /// Plain text, stickers, calls, and date dividers are never eligible
+  /// anywhere - view once is strictly a media feature in every real app.
+  static const Map<Platform, Set<MessageType>> _oneTimeEligibleTypes = {
+    Platform.whatsapp: {MessageType.image, MessageType.video, MessageType.audio},
+    Platform.instagram: {MessageType.image, MessageType.video},
+    Platform.messenger: {MessageType.image, MessageType.video},
+    Platform.snapchat: {MessageType.image, MessageType.video, MessageType.audio},
+  };
+
+  static bool canBeOneTime(Platform platform, MessageType type) {
+    return _oneTimeEligibleTypes[platform]?.contains(type) ?? false;
+  }
+
+  /// Whether the one-time toggle should even be offered for this type,
+  /// regardless of platform (calls/dividers/stickers/text are never
+  /// "view once" content in any real chat app).
+  static bool isOneTimeCapableType(MessageType type) {
+    return type == MessageType.image || type == MessageType.video || type == MessageType.audio;
+  }
+
+  /// Whether the "Deleted / Unsent" toggle should be offered for this type.
+  /// Every real message type can be deleted/unsent except the synthetic
+  /// date-divider row, which isn't an actual message.
+  static bool canBeDeleted(MessageType type) {
+    return type != MessageType.dateDivider;
+  }
+}
 
 class ChatUser {
   final String id;
@@ -68,32 +110,46 @@ class ChatUser {
     );
   }
 
-  String get statusText {
+  String statusText(bool isArabic) {
     switch (onlineStatus) {
       case UserOnlineStatus.online:
-        return 'online';
+        return isArabic ? 'متصل الآن' : 'online';
       case UserOnlineStatus.typing:
-        return 'typing...';
+        return isArabic ? 'يكتب الآن...' : 'typing...';
       case UserOnlineStatus.offline:
         if (lastSeen != null) {
-          return 'last seen ${_formatLastSeen(lastSeen!)}';
+          return '${isArabic ? 'آخر ظهور' : 'last seen'} ${_formatLastSeen(lastSeen!, isArabic)}';
         }
-        return 'offline';
+        return isArabic ? 'غير متصل' : 'offline';
       case UserOnlineStatus.lastSeen:
         if (lastSeen != null) {
-          return 'last seen ${_formatLastSeen(lastSeen!)}';
+          return '${isArabic ? 'آخر ظهور' : 'last seen'} ${_formatLastSeen(lastSeen!, isArabic)}';
         }
-        return 'last seen recently';
+        return isArabic ? 'آخر ظهور كان قريبًا' : 'last seen recently';
     }
   }
 
-  String _formatLastSeen(DateTime dt) {
+  String _formatLastSeen(DateTime dt, bool isArabic) {
     final now = DateTime.now();
     final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} minutes ago';
-    if (diff.inHours < 24) return 'today at ${_time(dt)}';
-    if (diff.inDays == 1) return 'yesterday at ${_time(dt)}';
+    if (diff.inMinutes < 1) {
+      return isArabic ? 'الآن' : 'just now';
+    }
+    if (diff.inMinutes < 60) {
+      if (isArabic) {
+        if (diff.inMinutes == 1) return 'منذ دقيقة';
+        if (diff.inMinutes == 2) return 'منذ دقيقتين';
+        if (diff.inMinutes >= 3 && diff.inMinutes <= 10) return 'منذ ${diff.inMinutes} دقائق';
+        return 'منذ ${diff.inMinutes} دقيقة';
+      }
+      return '${diff.inMinutes} minutes ago';
+    }
+    if (diff.inHours < 24) {
+      return isArabic ? 'اليوم في ${_time(dt)}' : 'today at ${_time(dt)}';
+    }
+    if (diff.inDays == 1) {
+      return isArabic ? 'أمس في ${_time(dt)}' : 'yesterday at ${_time(dt)}';
+    }
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 
@@ -125,6 +181,9 @@ class ChatMessage {
   Uint8List? videoBytes;
   Uint8List? audioBytes;
   bool isForwarded;
+  bool isDeleted;
+  bool isOneTime;
+  bool isOneTimeOpened;
 
   ChatMessage({
     required this.id,
@@ -147,6 +206,9 @@ class ChatMessage {
     this.videoBytes,
     this.audioBytes,
     this.isForwarded = false,
+    this.isDeleted = false,
+    this.isOneTime = false,
+    this.isOneTimeOpened = false,
   });
 
   ChatMessage copyWith({
@@ -173,6 +235,9 @@ class ChatMessage {
     Uint8List? audioBytes,
     bool clearAudioBytes = false,
     bool? isForwarded,
+    bool? isDeleted,
+    bool? isOneTime,
+    bool? isOneTimeOpened,
   }) {
     return ChatMessage(
       id: id,
@@ -195,6 +260,9 @@ class ChatMessage {
       videoBytes: clearVideoBytes ? null : (videoBytes ?? this.videoBytes),
       audioBytes: clearAudioBytes ? null : (audioBytes ?? this.audioBytes),
       isForwarded: isForwarded ?? this.isForwarded,
+      isDeleted: isDeleted ?? this.isDeleted,
+      isOneTime: isOneTime ?? this.isOneTime,
+      isOneTimeOpened: isOneTimeOpened ?? this.isOneTimeOpened,
     );
   }
 
@@ -220,6 +288,9 @@ class ChatMessage {
       'videoBytes': videoBytes,
       'audioBytes': audioBytes,
       'isForwarded': isForwarded,
+      'isDeleted': isDeleted,
+      'isOneTime': isOneTime,
+      'isOneTimeOpened': isOneTimeOpened,
     };
   }
 
@@ -249,6 +320,9 @@ class ChatMessage {
       videoBytes: _parseBytes(map['videoBytes']),
       audioBytes: _parseBytes(map['audioBytes']),
       isForwarded: map['isForwarded'] as bool? ?? false,
+      isDeleted: map['isDeleted'] as bool? ?? false,
+      isOneTime: map['isOneTime'] as bool? ?? false,
+      isOneTimeOpened: map['isOneTimeOpened'] as bool? ?? false,
     );
   }
 
@@ -256,6 +330,67 @@ class ChatMessage {
     final h = timestamp.hour.toString().padLeft(2, '0');
     final m = timestamp.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+}
+
+/// Platform-accurate copy for "Deleted" / "View Once" messages, shared by
+/// the chat bubble renderer and any inbox/last-message preview so the
+/// wording can never drift between the two surfaces.
+extension ChatMessagePreviewText on ChatMessage {
+  String deletedPreviewText(Platform platform, String contactName, bool isArabic) {
+    switch (platform) {
+      case Platform.whatsapp:
+        return isSender
+            ? LanguageHelper.translate('deleted_msg_wa_sender', isArabic)
+            : LanguageHelper.translate('deleted_msg_wa_receiver', isArabic);
+      case Platform.messenger:
+        return isSender
+            ? LanguageHelper.translate('deleted_msg_messenger_sender', isArabic)
+            : '$contactName ${LanguageHelper.translate('deleted_msg_messenger_receiver_verb', isArabic)}';
+      case Platform.instagram:
+        return isSender
+            ? LanguageHelper.translate('deleted_msg_instagram_sender', isArabic)
+            : '$contactName ${LanguageHelper.translate('deleted_msg_instagram_receiver_verb', isArabic)}';
+      case Platform.snapchat:
+        return isSender
+            ? LanguageHelper.translate('deleted_msg_snapchat_sender', isArabic)
+            : LanguageHelper.translate('deleted_msg_snapchat_receiver', isArabic);
+    }
+  }
+
+  /// Label for the still-media-type portion of a one-time message (e.g.
+  /// "Photo" / "New Snap"). Does not account for the "Opened" state -
+  /// callers that need that should check `isOneTimeOpened` themselves.
+  String oneTimeMediaLabel(Platform platform, bool isArabic) {
+    final isVideo = type == MessageType.video;
+    final isAudio = type == MessageType.audio;
+    switch (platform) {
+      case Platform.whatsapp:
+        if (isAudio) return LanguageHelper.translate('one_time_voice', isArabic);
+        return LanguageHelper.translate(isVideo ? 'one_time_video' : 'one_time_photo', isArabic);
+      case Platform.instagram:
+        return LanguageHelper.translate(isVideo ? 'one_time_video' : 'one_time_photo', isArabic);
+      case Platform.messenger:
+        return LanguageHelper.translate(isVideo ? 'one_time_messenger_video' : 'one_time_messenger_photo', isArabic);
+      case Platform.snapchat:
+        if (isAudio) return LanguageHelper.translate('one_time_new_audio_note', isArabic);
+        return LanguageHelper.translate(isVideo ? 'one_time_new_video_snap' : 'one_time_new_snap', isArabic);
+    }
+  }
+
+  /// Full one-time preview text, accounting for the opened/unopened state -
+  /// what an inbox/last-message row should show.
+  String oneTimePreviewText(Platform platform, bool isArabic) {
+    if (isOneTimeOpened) return LanguageHelper.translate('one_time_opened_text', isArabic);
+    return oneTimeMediaLabel(platform, isArabic);
+  }
+
+  /// Short preview string suitable for an inbox/chat-list last-message row,
+  /// accounting for deleted/one-time state before falling back to raw text.
+  String previewText(Platform platform, String contactName, bool isArabic) {
+    if (isDeleted) return deletedPreviewText(platform, contactName, isArabic);
+    if (isOneTime) return oneTimePreviewText(platform, isArabic);
+    return text;
   }
 }
 

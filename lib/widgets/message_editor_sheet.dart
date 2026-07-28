@@ -11,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../themes/platform_themes.dart';
 import '../utils/language_helper.dart';
 import 'editor_panel.dart';
+import 'background_remover_dialog.dart';
 
 const _uuid = Uuid();
 
@@ -42,6 +43,9 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
   late bool _isVoiceNote;
   late bool _isVideoMessage;
   late bool _isForwarded;
+  late bool _isDeleted;
+  late bool _isOneTime;
+  late bool _isOneTimeOpened;
 
   int _minutes = 0;
   int _seconds = 30;
@@ -76,6 +80,17 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     _isVoiceNote = msg?.isVoiceNote ?? false;
     _isVideoMessage = msg?.isVideoMessage ?? false;
     _isForwarded = msg?.isForwarded ?? false;
+    _isDeleted = msg?.isDeleted ?? false;
+    _isOneTime = msg?.isOneTime ?? false;
+    _isOneTimeOpened = msg?.isOneTimeOpened ?? false;
+
+    // Guard against stale data (e.g. edited on a different platform before)
+    // that no real app could actually produce - e.g. a one-time voice note
+    // on Instagram, which has no such feature.
+    final loadedPlatform = chatProvider.activeSession?.platform ?? Platform.whatsapp;
+    if (_isOneTime && !MessageFeatureRules.canBeOneTime(loadedPlatform, _type)) {
+      _isOneTime = false;
+    }
 
     _repliedToId = msg?.repliedToId;
     _repliedToText = msg?.repliedToText;
@@ -166,6 +181,37 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     }
   }
 
+  Future<void> _pickStickerDirect() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
+    if (file != null) {
+      final bytes = await file.readAsBytes();
+      setState(() {
+        _imageBytes = bytes;
+        _type = MessageType.sticker;
+      });
+    }
+  }
+
+  Future<void> _pickStickerAndRemoveBackground() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
+    if (file != null) {
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      final processedBytes = await showDialog<Uint8List>(
+        context: context,
+        builder: (_) => BackgroundRemoverDialog(originalBytes: bytes),
+      );
+      if (processedBytes != null) {
+        setState(() {
+          _imageBytes = processedBytes;
+          _type = MessageType.sticker;
+        });
+      }
+    }
+  }
+
   Future<void> _pickVideo() async {
     final picker = ImagePicker();
     final file = await picker.pickVideo(source: ImageSource.gallery);
@@ -221,7 +267,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     final chatProvider = context.read<ChatProvider>();
     final text = _textController.text.trim();
 
-    if (_type == MessageType.text && text.isEmpty) {
+    if (_type == MessageType.text && text.isEmpty && !_isDeleted && !_isOneTime) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Message text cannot be empty')),
       );
@@ -267,6 +313,9 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
           isForwarded: _isForwarded,
           audioBytes: _audioBytes,
           clearAudioBytes: _audioBytes == null,
+          isDeleted: _isDeleted,
+          isOneTime: _isOneTime,
+          isOneTimeOpened: _isOneTimeOpened,
         ),
       );
     } else {
@@ -290,21 +339,43 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
         videoBytes: _videoBytes,
         isForwarded: _isForwarded,
         audioBytes: _audioBytes,
+        isDeleted: _isDeleted,
+        isOneTime: _isOneTime,
+        isOneTimeOpened: _isOneTimeOpened,
       );
       chatProvider.addMessage(newMessage);
     }
     Navigator.pop(context);
   }
 
-  String _typeLabel(MessageType t) {
+  String _typeLabel(MessageType t, bool isAr) {
     switch (t) {
-      case MessageType.text: return 'Text Message';
-      case MessageType.image: return 'Image Message';
-      case MessageType.audio: return 'Audio Message';
-      case MessageType.video: return 'Video Message';
-      case MessageType.voiceCall: return 'Voice Call Record';
-      case MessageType.videoCall: return 'Video Call Record';
-      case MessageType.dateDivider: return 'Date Separator';
+      case MessageType.text: return isAr ? 'رسالة نصية' : 'Text Message';
+      case MessageType.image: return isAr ? 'رسالة صورة' : 'Image Message';
+      case MessageType.sticker: return isAr ? 'ملصق' : 'Sticker';
+      case MessageType.audio: return isAr ? 'رسالة صوتية' : 'Audio Message';
+      case MessageType.video: return isAr ? 'رسالة فيديو' : 'Video Message';
+      case MessageType.voiceCall: return isAr ? 'سجل مكالمة صوتية' : 'Voice Call Record';
+      case MessageType.videoCall: return isAr ? 'سجل مكالمة فيديو' : 'Video Call Record';
+      case MessageType.dateDivider: return isAr ? 'فاصل تاريخ' : 'Date Separator';
+    }
+  }
+
+  String _oneTimeChipLabel(MessageType t, bool isAr) {
+    switch (t) {
+      case MessageType.image: return isAr ? 'صورة' : 'Photo';
+      case MessageType.video: return isAr ? 'مقطع فيديو' : 'Video';
+      case MessageType.audio: return isAr ? 'صوتية' : 'Voice';
+      default: return isAr ? 'وسائط' : 'Media';
+    }
+  }
+
+  String _platformDisplayName(Platform p, bool isAr) {
+    switch (p) {
+      case Platform.whatsapp: return 'WhatsApp';
+      case Platform.messenger: return 'Messenger';
+      case Platform.instagram: return 'Instagram';
+      case Platform.snapchat: return 'Snapchat';
     }
   }
 
@@ -312,9 +383,13 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final chatProvider = context.watch<ChatProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final isAr = themeProvider.isArabic;
     final session = chatProvider.activeSession;
+    final platform = session?.platform ?? Platform.whatsapp;
     final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
     final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
+    final labelColor = Colors.white30;
 
     return Container(
       decoration: const BoxDecoration(
@@ -345,7 +420,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             const SizedBox(height: 20),
 
             // Dropdown selection for message/divider type
-            _SLabel('Component Type'),
+            _SLabel(LanguageHelper.translate('choose_type', isAr)),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -363,7 +438,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   items: MessageType.values.map((type) {
                     return DropdownMenuItem<MessageType>(
                       value: type,
-                      child: Text(_typeLabel(type)),
+                      child: Text(_typeLabel(type, isAr)),
                     );
                   }).toList(),
                   onChanged: (newVal) {
@@ -375,6 +450,12 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                         } else if (_type == MessageType.dateDivider && _textController.text.isEmpty) {
                           _textController.text = 'Today';
                         }
+                        if (_isOneTime && !MessageFeatureRules.canBeOneTime(platform, _type)) {
+                          _isOneTime = false;
+                        }
+                        if (_isDeleted && !MessageFeatureRules.canBeDeleted(_type)) {
+                          _isDeleted = false;
+                        }
                       });
                     }
                   },
@@ -385,7 +466,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Presentation Formats (Voice Note vs Audio File, Circular Video vs Standard Video)
             if (_type == MessageType.audio) ...[
-              _SLabel('Audio Style'),
+              _SLabel(LanguageHelper.translate('layout_format', isAr)),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -399,9 +480,9 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     dropdownColor: const Color(0xFF1E1E1E),
                     isExpanded: true,
                     style: const TextStyle(color: Colors.white, fontSize: 14),
-                    items: const [
-                      DropdownMenuItem(value: true, child: Text('Voice Note (Recorded layout)')),
-                      DropdownMenuItem(value: false, child: Text('Audio File (Picked layout)')),
+                    items: [
+                      DropdownMenuItem(value: true, child: Text(LanguageHelper.translate('rec_voice_note_menu', isAr))),
+                      DropdownMenuItem(value: false, child: Text(LanguageHelper.translate('add_audio_file_menu', isAr))),
                     ],
                     onChanged: (v) {
                       if (v != null) {
@@ -416,7 +497,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
               ),
               const SizedBox(height: 16),
               if (_isVoiceNote) ...[
-                _SLabel('Voice Recording'),
+                _SLabel(LanguageHelper.translate('recording_voice_note', isAr)),
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: _recordVoiceNote,
@@ -442,8 +523,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                           const SizedBox(width: 8),
                           Text(
                             _audioBytes != null
-                                ? 'Voice Note Recorded (${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')})'
-                                : 'Tap to Record Voice Note',
+                                ? (isAr ? 'تم تسجيل رسالة صوتية (${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')})' : 'Voice Note Recorded (${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')})')
+                                : (isAr ? 'اضغط لتسجيل رسالة صوتية' : 'Tap to Record Voice Note'),
                             style: TextStyle(
                               color: _audioBytes != null ? Colors.white : Colors.white38,
                               fontSize: 13,
@@ -469,7 +550,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 ),
                 const SizedBox(height: 16),
               ] else ...[
-                _SLabel('Audio File Upload'),
+                _SLabel(LanguageHelper.translate('add_audio_file', isAr)),
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: _pickAudioFile,
@@ -496,8 +577,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                           Expanded(
                             child: Text(
                               _audioBytes != null
-                                  ? 'Audio: ${_fileNameController.text} (${_fileSizeController.text})'
-                                  : 'Tap to Pick Audio File',
+                                  ? '${LanguageHelper.translate('audio', isAr)}: ${_fileNameController.text} (${_fileSizeController.text})'
+                                  : LanguageHelper.translate('tap_to_pick_audio', isAr),
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -529,27 +610,27 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _SLabel('Audio File Name'),
+                _SLabel(LanguageHelper.translate('file_name', isAr)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _fileNameController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'e.g. AUD-20260614-WA0001.mp3'),
+                  decoration: InputDecoration(hintText: isAr ? 'مثال: AUD-20260614-WA0001.mp3' : 'e.g. AUD-20260614-WA0001.mp3'),
                 ),
                 const SizedBox(height: 16),
-                _SLabel('Audio File Size'),
+                _SLabel(LanguageHelper.translate('file_size', isAr)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _fileSizeController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'e.g. 1.2 MB'),
+                  decoration: InputDecoration(hintText: isAr ? 'مثال: 1.2 ميجابايت' : 'e.g. 1.2 MB'),
                 ),
                 const SizedBox(height: 16),
               ],
             ],
 
             if (_type == MessageType.video) ...[
-              _SLabel('Video Style'),
+              _SLabel(LanguageHelper.translate('layout_format', isAr)),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -563,9 +644,9 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     dropdownColor: const Color(0xFF1E1E1E),
                     isExpanded: true,
                     style: const TextStyle(color: Colors.white, fontSize: 14),
-                    items: const [
-                      DropdownMenuItem(value: true, child: Text('Instant Video Note (Circular)')),
-                      DropdownMenuItem(value: false, child: Text('Standard Video Attachment (Rectangular)')),
+                    items: [
+                      DropdownMenuItem(value: true, child: Text(LanguageHelper.translate('instant_video_note', isAr))),
+                      DropdownMenuItem(value: false, child: Text(LanguageHelper.translate('standard_video_attachment', isAr))),
                     ],
                     onChanged: (v) {
                       if (v != null) {
@@ -579,20 +660,20 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
               ),
               const SizedBox(height: 16),
               if (!_isVideoMessage) ...[
-                _SLabel('Video File Name'),
+                _SLabel(LanguageHelper.translate('file_name', isAr)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _fileNameController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'e.g. VID-20260614-WA0001.mp4'),
+                  decoration: InputDecoration(hintText: isAr ? 'مثال: VID-20260614-WA0001.mp4' : 'e.g. VID-20260614-WA0001.mp4'),
                 ),
                 const SizedBox(height: 16),
-                _SLabel('Video File Size'),
+                _SLabel(LanguageHelper.translate('file_size', isAr)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _fileSizeController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'e.g. 4.2 MB'),
+                  decoration: InputDecoration(hintText: isAr ? 'مثال: 4.2 ميجابايت' : 'e.g. 4.2 MB'),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -600,7 +681,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Quoted Reply Section (Hidden for dateDividers)
             if (_type != MessageType.dateDivider) ...[
-              _SLabel('Quoted Reply'),
+              _SLabel(LanguageHelper.translate('add_quoted_reply', isAr)),
               const SizedBox(height: 6),
               if (_repliedToId != null) ...[
                 Builder(
@@ -656,7 +737,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  _repliedToSenderName ?? 'Contact',
+                                  _repliedToSenderName ?? LanguageHelper.translate('contact', isAr),
                                   style: const TextStyle(
                                     color: Color(0xFF4CAF50),
                                     fontSize: 12,
@@ -776,7 +857,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   ),
                   icon: const Icon(Icons.reply_rounded, size: 18),
-                  label: const Text('Add Quoted Reply'),
+                  label: Text(LanguageHelper.translate('add_quoted_reply', isAr)),
                   onPressed: () => _showSelectReplyDialog(context),
                 ),
               ],
@@ -787,7 +868,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             if (_type != MessageType.voiceCall && _type != MessageType.videoCall) ...[
               // Video picker (only for video type)
               if (_type == MessageType.video) ...[
-                _SLabel('Video Cover Frame / Thumbnail'),
+                _SLabel(isAr ? 'إطار غلاف الفيديو / الصورة المصغرة' : 'Video Cover Frame / Thumbnail'),
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: _pickImage,
@@ -840,12 +921,12 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                                       color: Colors.black54,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Row(
+                                    child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.swap_horiz_rounded, size: 14, color: Colors.white),
-                                        SizedBox(width: 4),
-                                        Text('Change Cover Frame', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                        const Icon(Icons.swap_horiz_rounded, size: 14, color: Colors.white),
+                                        const SizedBox(width: 4),
+                                        Text(LanguageHelper.translate('change_cover_frame', isAr), style: const TextStyle(color: Colors.white, fontSize: 12)),
                                       ],
                                     ),
                                   ),
@@ -853,18 +934,18 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                               ),
                             ],
                           )
-                        : const Column(
+                        : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.add_photo_alternate_outlined, size: 32, color: Colors.white38),
-                              SizedBox(height: 8),
-                              Text('Tap to pick video cover frame / image', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                              Icon(Icons.add_photo_alternate_outlined, size: 32, color: labelColor),
+                              const SizedBox(height: 8),
+                              Text(LanguageHelper.translate('tap_to_pick_video_cover', isAr), style: TextStyle(color: labelColor, fontSize: 13)),
                             ],
                           ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                _SLabel('Video File (Optional)'),
+                _SLabel(isAr ? 'ملف الفيديو (اختياري)' : 'Video File (Optional)'),
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: _pickVideo,
@@ -890,8 +971,10 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                           const SizedBox(width: 8),
                           Text(
                             _videoBytes != null
-                                ? 'Change Video File (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)'
-                                : 'Pick Video File',
+                                ? (isAr
+                                    ? 'تغيير ملف الفيديو (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} ميجابايت)'
+                                    : 'Change Video File (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)')
+                                : (isAr ? 'اختر ملف الفيديو' : 'Pick Video File'),
                             style: TextStyle(
                               color: _videoBytes != null ? const Color(0xFF6C63FF) : Colors.white38,
                               fontSize: 13,
@@ -906,7 +989,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
               ],
               // Image picker (only for image type)
               if (_type == MessageType.image) ...[
-                _SLabel('Image'),
+                _SLabel(LanguageHelper.translate('image', isAr)),
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: _pickImage,
@@ -959,12 +1042,12 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                                       color: Colors.black54,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Row(
+                                    child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.swap_horiz_rounded, size: 14, color: Colors.white),
-                                        SizedBox(width: 4),
-                                        Text('Change', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                        const Icon(Icons.swap_horiz_rounded, size: 14, color: Colors.white),
+                                        const SizedBox(width: 4),
+                                        Text(LanguageHelper.translate('change', isAr), style: const TextStyle(color: Colors.white, fontSize: 12)),
                                       ],
                                     ),
                                   ),
@@ -972,26 +1055,87 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                               ),
                             ],
                           )
-                        : const Column(
+                        : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.add_photo_alternate_outlined, size: 32, color: Colors.white38),
-                              SizedBox(height: 8),
-                              Text('Tap to pick image', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                              Icon(Icons.add_photo_alternate_outlined, size: 32, color: labelColor),
+                              const SizedBox(height: 8),
+                              Text(LanguageHelper.translate('tap_to_pick_image', isAr), style: TextStyle(color: labelColor, fontSize: 13)),
                             ],
                           ),
                   ),
                 ),
                 const SizedBox(height: 16),
               ],
-              _SLabel(_type == MessageType.dateDivider ? 'Date Separator Label' : (_type == MessageType.image ? 'Caption (Optional)' : 'Message Text')),
+
+              // Sticker picker options (for sticker type)
+              if (_type == MessageType.sticker) ...[
+                _SLabel(isAr ? 'صورة الملصق' : 'Sticker Image'),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF242424),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: Colors.white24),
+                          ),
+                        ),
+                        icon: const Icon(Icons.image_outlined, size: 18),
+                        label: Text(
+                          isAr ? 'صورة مباشرة' : 'Direct Image',
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                        onPressed: _pickStickerDirect,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                        label: Text(
+                          isAr ? 'إزالة الخلفية' : 'Remove BG',
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: _pickStickerAndRemoveBackground,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_imageBytes != null) ...[
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF242424),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Image.memory(_imageBytes!, width: 100, height: 100, fit: BoxFit.contain),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+              ],
+              _SLabel(_type == MessageType.dateDivider ? (isAr ? 'ملصق فاصل التاريخ' : 'Date Separator Label') : (_type == MessageType.image ? (isAr ? 'شرح الصورة (اختياري)' : 'Caption (Optional)') : (isAr ? 'نص الرسالة' : 'Message Text'))),
               const SizedBox(height: 6),
               TextField(
                 controller: _textController,
                 style: const TextStyle(color: Colors.white),
                 maxLines: _type == MessageType.dateDivider ? 1 : 3,
                 decoration: InputDecoration(
-                  hintText: _type == MessageType.dateDivider ? 'e.g., Sunday, May 25, or TODAY' : 'Type your text here...',
+                  hintText: _type == MessageType.dateDivider ? (isAr ? 'مثال: الأحد، 25 مايو، أو اليوم' : 'e.g., Sunday, May 25, or TODAY') : (isAr ? 'اكتب رسالتك المحاكاة...' : 'Type your text here...'),
                 ),
               ),
               const SizedBox(height: 16),
@@ -999,7 +1143,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Date Preset capsules (Only for dateDivider)
             if (_type == MessageType.dateDivider) ...[
-              _SLabel('Date Presets'),
+              _SLabel(isAr ? 'قوالب التاريخ الجاهزة' : 'Date Presets'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -1014,7 +1158,10 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.white10),
                       ),
-                      child: Text(preset, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      child: Text(
+                        preset == 'Call Logs' && isAr ? 'سجل المكالمات' : LanguageHelper.translateDate(preset, isAr),
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -1024,11 +1171,18 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Call Status Selector capsules (Only for voice/video calls)
             if (_type == MessageType.voiceCall || _type == MessageType.videoCall) ...[
-              _SLabel('Call Status Details'),
+              _SLabel(isAr ? 'تفاصيل حالة المكالمة' : 'Call Status Details'),
               const SizedBox(height: 8),
               Row(
                 children: ['Answered', 'Missed', 'Declined', 'No Answer'].map((status) {
                   final isSelected = _callStatus == status;
+                  final statusLabelText = status == 'Answered'
+                      ? (isAr ? 'تم الرد عليها' : 'Answered')
+                      : status == 'Missed'
+                          ? (isAr ? 'فائتة' : 'Missed')
+                          : status == 'Declined'
+                              ? (isAr ? 'مرفوضة' : 'Declined')
+                              : (isAr ? 'لم يرد عليها' : 'No Answer');
                   return Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() => _callStatus = status),
@@ -1046,7 +1200,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                         ),
                         child: Center(
                           child: Text(
-                            status,
+                            statusLabelText,
                             style: TextStyle(
                               fontSize: 11,
                               color: isSelected ? accentColor : Colors.white70,
@@ -1066,13 +1220,13 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             if (_type == MessageType.audio || 
                 _type == MessageType.video ||
                 ((_type == MessageType.voiceCall || _type == MessageType.videoCall) && _callStatus == 'Answered')) ...[
-              _SLabel('Call / Audio Duration'),
+              _SLabel(isAr ? 'مدة المكالمة / الصوت' : 'Call / Audio Duration'),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _NumberPickerSimple(
-                    label: 'Min',
+                    label: isAr ? 'دقيقة' : 'Min',
                     value: _minutes,
                     min: 0,
                     max: 59,
@@ -1083,7 +1237,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     child: Text(':', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                   ),
                   _NumberPickerSimple(
-                    label: 'Sec',
+                    label: isAr ? 'ثانية' : 'Sec',
                     value: _seconds,
                     min: 0,
                     max: 59,
@@ -1096,7 +1250,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Emoji Reaction Selector (Hidden for dateDividers)
             if (_type != MessageType.dateDivider) ...[
-              _SLabel('Message Reaction (Emoji)'),
+              _SLabel(isAr ? 'تفاعل الرسالة (إيموجي)' : 'Message Reaction (Emoji)'),
               const SizedBox(height: 8),
               Row(
                 children: ['❤️', '👍', '😂', '😮', '😢', '🙏'].map((emoji) {
@@ -1135,8 +1289,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 controller: _reactionController,
                 maxLength: 4,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Or type custom reaction emoji...',
+                decoration: InputDecoration(
+                  hintText: isAr ? 'أو اكتب تفاعل إيموجي مخصص...' : 'Or type custom reaction emoji...',
                   counterText: '',
                 ),
                 onChanged: (v) {
@@ -1150,13 +1304,13 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Sender / Receiver Toggle (Hidden for dateDividers)
             if (_type != MessageType.dateDivider) ...[
-              _SLabel(_type == MessageType.voiceCall || _type == MessageType.videoCall ? 'Call Direction' : 'Side'),
+              _SLabel(_type == MessageType.voiceCall || _type == MessageType.videoCall ? (isAr ? 'اتجاه المكالمة' : 'Call Direction') : (isAr ? 'الطرف المرسل' : 'Side')),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: _SideButton(
-                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? 'Outgoing (Right)' : 'Me (Right)',
+                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? (isAr ? 'صادرة (يمين)' : 'Outgoing (Right)') : (isAr ? 'أنا (اليمين)' : 'Me (Right)'),
                       icon: Icons.send_rounded,
                       isActive: _isSender,
                       color: accentColor,
@@ -1166,7 +1320,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _SideButton(
-                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? 'Incoming (Left)' : 'Them (Left)',
+                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? (isAr ? 'واردة (يسار)' : 'Incoming (Left)') : (isAr ? 'الطرف الآخر (اليسار)' : 'Them (Left)'),
                       icon: Icons.person_rounded,
                       isActive: !_isSender,
                       color: const Color(0xFF42A5F5),
@@ -1182,8 +1336,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             if (_type != MessageType.dateDivider) ...[
               Row(
                 children: [
-                  const Expanded(
-                    child: Text('Forwarded Message', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  Expanded(
+                    child: Text(LanguageHelper.translate('forwarded_message', isAr), style: const TextStyle(color: Colors.white70, fontSize: 14)),
                   ),
                   Switch(
                     value: _isForwarded,
@@ -1192,12 +1346,160 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+
+              // Deleted Message Toggle
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF242424),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.do_not_disturb_alt_rounded, color: Colors.redAccent, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isAr ? 'رسالة محذوفة (ألغيت)' : 'Deleted Message (Unsent)',
+                        style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                      ),
+                    ),
+                    Switch(
+                      value: _isDeleted,
+                      activeColor: Colors.redAccent,
+                      onChanged: (v) => setState(() => _isDeleted = v),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // View Once / One Time Toggle - only offered for media types that
+              // are actually eligible on the current platform in real apps
+              // (e.g. Messenger/Instagram have no one-time voice notes).
+              if (MessageFeatureRules.isOneTimeCapableType(_type)) ...[
+                Builder(builder: (context) {
+                  final oneTimeSupported = MessageFeatureRules.canBeOneTime(platform, _type);
+                  final eligibleTypes = [MessageType.image, MessageType.video, MessageType.audio]
+                      .where((t) => MessageFeatureRules.canBeOneTime(platform, t))
+                      .toList();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF242424),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.looks_one_rounded, color: oneTimeSupported ? const Color(0xFF25D366) : Colors.white24, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                isAr ? 'عرض لمرة واحدة (View Once)' : 'View Once (One Time)',
+                                style: TextStyle(color: oneTimeSupported ? Colors.white : Colors.white38, fontSize: 13.5),
+                              ),
+                            ),
+                            Switch(
+                              value: oneTimeSupported && _isOneTime,
+                              activeColor: const Color(0xFF25D366),
+                              onChanged: oneTimeSupported ? (v) => setState(() => _isOneTime = v) : null,
+                            ),
+                          ],
+                        ),
+                        if (!oneTimeSupported)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Align(
+                              alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+                              child: Text(
+                                isAr
+                                    ? '${_platformDisplayName(platform, isAr)} لا يدعم عرض ${_oneTimeChipLabel(_type, isAr)} لمرة واحدة'
+                                    : '${_platformDisplayName(platform, isAr)} doesn\'t support view-once ${_oneTimeChipLabel(_type, false).toLowerCase()}',
+                                style: const TextStyle(color: Colors.white38, fontSize: 11.5, fontStyle: FontStyle.italic),
+                              ),
+                            ),
+                          ),
+                        if (_isOneTime && oneTimeSupported) ...[
+                          const Divider(color: Colors.white10),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      isAr ? 'حالة القراءة:' : 'Viewed State:',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                                    ),
+                                    const Spacer(),
+                                    ChoiceChip(
+                                      label: Text(isAr ? 'لم تُفتح' : 'Unopened'),
+                                      selected: !_isOneTimeOpened,
+                                      selectedColor: const Color(0xFF25D366),
+                                      backgroundColor: Colors.white10,
+                                      labelStyle: TextStyle(color: !_isOneTimeOpened ? Colors.black : Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                      onSelected: (val) => setState(() => _isOneTimeOpened = !val),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ChoiceChip(
+                                      label: Text(isAr ? 'تم فتحها' : 'Opened'),
+                                      selected: _isOneTimeOpened,
+                                      selectedColor: Colors.grey,
+                                      backgroundColor: Colors.white10,
+                                      labelStyle: TextStyle(color: _isOneTimeOpened ? Colors.black : Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                      onSelected: (val) => setState(() => _isOneTimeOpened = val),
+                                    ),
+                                  ],
+                                ),
+                                if (!_isOneTimeOpened && eligibleTypes.length > 1) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    isAr ? 'نوع الوسائط:' : 'Media Category:',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      for (final t in eligibleTypes) ...[
+                                        ChoiceChip(
+                                          label: Text(_oneTimeChipLabel(t, isAr)),
+                                          selected: _type == t,
+                                          selectedColor: const Color(0xFF25D366),
+                                          backgroundColor: Colors.white10,
+                                          labelStyle: TextStyle(color: _type == t ? Colors.black : Colors.white, fontSize: 11.5),
+                                          onSelected: (val) {
+                                            if (val) {
+                                              setState(() {
+                                                _type = t;
+                                                _textController.text = '';
+                                              });
+                                            }
+                                          },
+                                        ),
+                                        if (t != eligibleTypes.last) const SizedBox(width: 6),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 16),
+              ],
             ],
 
             // Message Status (only for sender & text/image/audio)
             if (_isSender && _type != MessageType.dateDivider && _type != MessageType.voiceCall && _type != MessageType.videoCall) ...[
-              _SLabel('Message Status'),
+              _SLabel(isAr ? 'حالة الرسالة' : 'Message Status'),
               const SizedBox(height: 8),
               Row(
                 children: MessageStatus.values.map((s) {
@@ -1221,7 +1523,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                             Icon(_statusIcon(s), size: 18, color: _status == s ? accentColor : Colors.white38),
                             const SizedBox(height: 3),
                             Text(
-                              _statusLabel(s),
+                              _statusLabel(s, isAr),
                               style: TextStyle(
                                 fontSize: 10,
                                 color: _status == s ? accentColor : Colors.white38,
@@ -1239,7 +1541,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             ],
 
             // Timestamp (Editable for all messages!)
-            _SLabel('Timestamp (Change Time)'),
+            _SLabel(isAr ? 'طابع الوقت (تغيير الوقت)' : 'Timestamp (Change Time)'),
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () async {
@@ -1270,10 +1572,10 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             Wrap(
               spacing: 8,
               children: [
-                _TimePreset(label: 'Just now', offset: Duration.zero, onSelect: (dt) => setState(() => _timestamp = dt)),
-                _TimePreset(label: '5 min ago', offset: const Duration(minutes: 5), onSelect: (dt) => setState(() => _timestamp = dt)),
-                _TimePreset(label: '1 hr ago', offset: const Duration(hours: 1), onSelect: (dt) => setState(() => _timestamp = dt)),
-                _TimePreset(label: 'Yesterday', offset: const Duration(days: 1), onSelect: (dt) => setState(() => _timestamp = dt)),
+                _TimePreset(label: isAr ? 'الآن' : 'Just now', offset: Duration.zero, onSelect: (dt) => setState(() => _timestamp = dt)),
+                _TimePreset(label: isAr ? 'منذ 5 دقائق' : '5 min ago', offset: const Duration(minutes: 5), onSelect: (dt) => setState(() => _timestamp = dt)),
+                _TimePreset(label: isAr ? 'منذ ساعة' : '1 hr ago', offset: const Duration(hours: 1), onSelect: (dt) => setState(() => _timestamp = dt)),
+                _TimePreset(label: LanguageHelper.translate('yesterday', isAr), offset: const Duration(days: 1), onSelect: (dt) => setState(() => _timestamp = dt)),
               ],
             ),
 
@@ -1289,7 +1591,9 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 ),
                 onPressed: _save,
                 child: Text(
-                  widget.editingMessage != null ? 'Update Component' : 'Add Component',
+                  widget.editingMessage != null
+                      ? (isAr ? 'تعديل المكون' : 'Update Component')
+                      : (isAr ? 'إضافة المكون' : 'Add Component'),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -1309,12 +1613,12 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     }
   }
 
-  String _statusLabel(MessageStatus s) {
+  String _statusLabel(MessageStatus s, bool isAr) {
     switch (s) {
-      case MessageStatus.sending: return 'Sending';
-      case MessageStatus.sent: return 'Sent';
-      case MessageStatus.delivered: return 'Delivered';
-      case MessageStatus.read: return 'Read';
+      case MessageStatus.sending: return isAr ? 'جاري الإرسال' : 'Sending';
+      case MessageStatus.sent: return isAr ? 'تم الإرسال' : 'Sent';
+      case MessageStatus.delivered: return isAr ? 'تم التسليم' : 'Delivered';
+      case MessageStatus.read: return isAr ? 'مقروءة' : 'Read';
     }
   }
 
@@ -1342,6 +1646,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     final chatProvider = context.read<ChatProvider>();
     final session = chatProvider.activeSession;
     if (session == null) return;
+    final isAr = context.read<ThemeProvider>().isArabic;
 
     final otherMessages = session.messages.where((m) {
       if (m.type == MessageType.dateDivider) return false;
@@ -1354,15 +1659,15 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Select Message to Quote', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text(LanguageHelper.translate('select_message_to_quote', isAr), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         content: SizedBox(
           width: double.maxFinite,
           child: otherMessages.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Text(
-                    'No other messages in this chat to reply to.',
-                    style: TextStyle(color: Colors.white38),
+                    isAr ? 'لا توجد رسائل أخرى في هذه الدردشة للرد عليها.' : 'No other messages in this chat to reply to.',
+                    style: const TextStyle(color: Colors.white38),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -1377,8 +1682,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     final dialogAccentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
 
                     final senderName = m.isSender
-                        ? 'You'
-                        : (session != null && session.contactUser.name.isNotEmpty ? session.contactUser.name : 'Contact');
+                        ? (isAr ? 'أنت' : 'You')
+                        : (session != null && session.contactUser.name.isNotEmpty ? session.contactUser.name : LanguageHelper.translate('contact', isAr));
 
                     return ListTile(
                       dense: true,
@@ -1508,7 +1813,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
         ),
         actions: [
           TextButton(
-            child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+            child: Text(LanguageHelper.translate('cancel', isAr), style: const TextStyle(color: Colors.white38)),
             onPressed: () => Navigator.pop(dialogCtx),
           ),
         ],

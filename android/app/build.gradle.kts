@@ -55,17 +55,12 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            ndk {
-                debugSymbolLevel = "NONE"
-            }
+            // ndk {
+            //     debugSymbolLevel = "NONE"
+            // }
         }
     }
 
-    packaging {
-        jniLibs {
-            keepDebugSymbols.add("**/*.so")
-        }
-    }
 }
 
 flutter {

@@ -24,34 +24,38 @@ class ChatViewport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: platformTheme.chatBg,
-      child: Column(
-        children: [
-          // Fake system status bar
-          if (!hideStatusBar)
-            FakeStatusBar(
-            time: session.fakeTime,
-            battery: session.fakeBattery,
-            hasWifi: session.fakeWifi,
-            backgroundColor: platformTheme.statusBarBg,
-            isLight: _isLightBar(session.platform, session.isDarkMode),
-          ),
-          // Platform-specific app bar
-          PlatformAppBar(
-            session: session,
-            platformTheme: platformTheme,
-          ),
-          // Chat messages area
-          Expanded(
-            child: _buildChatArea(context),
-          ),
-          // Platform input bar (bottom)
-          PlatformInputBar(
-            platform: session.platform,
-            platformTheme: platformTheme,
-          ),
-        ],
+    final bool isAr = context.watch<ThemeProvider>().isArabic;
+    return Directionality(
+      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+      child: Container(
+        color: platformTheme.chatBg,
+        child: Column(
+          children: [
+            // Fake system status bar
+            if (!hideStatusBar)
+              FakeStatusBar(
+                time: session.fakeTime,
+                battery: session.fakeBattery,
+                hasWifi: session.fakeWifi,
+                backgroundColor: platformTheme.statusBarBg,
+                isLight: _isLightBar(session.platform, session.isDarkMode),
+              ),
+            // Platform-specific app bar
+            PlatformAppBar(
+              session: session,
+              platformTheme: platformTheme,
+            ),
+            // Chat messages area
+            Expanded(
+              child: _buildChatArea(context),
+            ),
+            // Platform input bar (bottom)
+            PlatformInputBar(
+              platform: session.platform,
+              platformTheme: platformTheme,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -472,8 +476,12 @@ class _ProfileHeaderCard extends StatelessWidget {
     final isDark = session.isDarkMode;
 
     if (session.platform == Platform.whatsapp) {
+      final bool isAr = context.read<ThemeProvider>().isArabic;
       // Centered WhatsApp encryption log pill card
-      final String text = session.contactBio ?? 'Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them. Tap to learn more.';
+      final String text = session.contactBio ??
+          (isAr
+              ? 'الرسائل والمكالمات مشفرة تمامًا بين الطرفين. لا يمكن لأحد خارج هذه المحادثة، ولا حتى واتساب، قراءتها أو الاستماع إليها. انقر للمزيد.'
+              : 'Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them. Tap to learn more.');
       final Color cardBg = isDark ? const Color(0xFF182229) : const Color(0xFFFFEECD);
       final Color textCol = isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F);
       final Color lockCol = isDark ? const Color(0xFF00A884) : const Color(0xFF54656F);
