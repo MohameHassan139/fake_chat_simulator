@@ -35,10 +35,11 @@ class EditorPanel extends StatelessWidget {
     final isAr = context.read<ThemeProvider>().isArabic;
 
     if (chatProvider.viewChatList && session != null) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF111111),
-          border: Border(top: BorderSide(color: Color(0xFF222222))),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF111111) : Colors.white,
+          border: Border(top: BorderSide(color: isDark ? const Color(0xFF222222) : const Color(0xFFE2E2E2))),
         ),
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -66,8 +67,8 @@ class EditorPanel extends StatelessWidget {
                     children: [
                       Text(
                         isAr ? 'معاينة قائمة الرسائل نشطة' : 'Inbox (Chat List) Mode Active',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
                           fontSize: 15.5,
                           fontWeight: FontWeight.bold,
                         ),
@@ -77,8 +78,8 @@ class EditorPanel extends StatelessWidget {
                         isAr
                             ? 'أنت تعاين حاليًا صندوق الوارد لتطبيق ${session.platformName}. اضغط على أي محادثة في محاكي الهاتف لفتحها وتعديل محتواها.'
                             : 'You are previewing the inbox feed for ${session.platformName}. Tap any chat inside the phone frame above to open it and edit.',
-                        style: const TextStyle(
-                          color: Colors.white54,
+                        style: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.black54,
                           fontSize: 12,
                           height: 1.4,
                         ),
@@ -96,17 +97,17 @@ class EditorPanel extends StatelessWidget {
                   // Back to chat button
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF333333)),
+                      side: BorderSide(color: isDark ? const Color(0xFF333333) : const Color(0xFFCCCCCC)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                     ),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 16),
+                    icon: Icon(Icons.chat_bubble_outline_rounded, color: isDark ? Colors.white70 : Colors.black54, size: 16),
                     label: Text(
                       isAr ? 'العودة للمحادثة' : 'Back to Chat',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
                     ),
                     onPressed: () {
                       chatProvider.setViewChatList(false);
@@ -359,9 +360,10 @@ class _ActionRow extends StatelessWidget {
 
   void _showStickerOptions(BuildContext context) {
     final isAr = context.read<ThemeProvider>().isArabic;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetCtx) => SafeArea(
         child: Column(
@@ -369,7 +371,7 @@ class _ActionRow extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.image_outlined, color: Color(0xFF25D366)),
-              title: Text(isAr ? 'إضافة صورة كملصق مباشرة' : 'Add Image as Sticker (Direct)', style: const TextStyle(color: Colors.white)),
+              title: Text(isAr ? 'إضافة صورة كملصق مباشرة' : 'Add Image as Sticker (Direct)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _pickStickerDirect(context);
@@ -377,7 +379,7 @@ class _ActionRow extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.auto_fix_high_rounded, color: Color(0xFFFF6584)),
-              title: Text(isAr ? 'إضافة ملصق وإزالة الخلفية تلقائيًا' : 'Add Sticker with Background Removal', style: const TextStyle(color: Colors.white)),
+              title: Text(isAr ? 'إضافة ملصق وإزالة الخلفية تلقائيًا' : 'Add Sticker with Background Removal', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _pickStickerAndRemoveBackground(context);
@@ -432,9 +434,10 @@ class _ActionRow extends StatelessWidget {
 
   void _showAudioOptions(BuildContext context) {
     final isAr = context.read<ThemeProvider>().isArabic;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetCtx) => SafeArea(
         child: Column(
@@ -442,7 +445,7 @@ class _ActionRow extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.mic, color: Color(0xFF6C63FF)),
-              title: Text(isAr ? 'تسجيل رسالة صوتية (Voice Note)' : 'Record Voice Note (Recorded)', style: const TextStyle(color: Colors.white)),
+              title: Text(isAr ? 'تسجيل رسالة صوتية (Voice Note)' : 'Record Voice Note (Recorded)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _recordVoiceNote(context);
@@ -450,7 +453,7 @@ class _ActionRow extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.audiotrack, color: Color(0xFFF27B13)),
-              title: Text(isAr ? 'إضافة ملف صوتي (Audio File)' : 'Add Audio File (Picked)', style: const TextStyle(color: Colors.white)),
+              title: Text(isAr ? 'إضافة ملف صوتي (Audio File)' : 'Add Audio File (Picked)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _pickAudioFile(context);
@@ -503,9 +506,10 @@ class _ActionRow extends StatelessWidget {
 
   void _showVideoOptions(BuildContext context) {
     final isAr = context.read<ThemeProvider>().isArabic;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetCtx) => SafeArea(
         child: Column(
@@ -513,7 +517,7 @@ class _ActionRow extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.videocam, color: Color(0xFF6C63FF)),
-              title: Text(isAr ? 'تسجيل فيديو بالكاميرا' : 'Record Video Note (Camera)', style: const TextStyle(color: Colors.white)),
+              title: Text(isAr ? 'تسجيل فيديو بالكاميرا' : 'Record Video Note (Camera)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _captureVideo(context, ImageSource.camera);
@@ -521,7 +525,7 @@ class _ActionRow extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.video_library, color: Color(0xFFE1306C)),
-              title: Text(isAr ? 'اختيار فيديو من الاستوديو' : 'Pick Video File (Gallery)', style: const TextStyle(color: Colors.white)),
+              title: Text(isAr ? 'اختيار فيديو من الاستوديو' : 'Pick Video File (Gallery)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _captureVideo(context, ImageSource.gallery);

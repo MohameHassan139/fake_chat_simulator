@@ -13,6 +13,7 @@ import '../utils/audio_helper.dart';
 import '../themes/platform_themes.dart';
 import '../providers/theme_provider.dart';
 import '../providers/chat_provider.dart';
+import 'media_fullscreen_viewer.dart';
 
 bool _isArabic(String text) {
   final arabicRegExp = RegExp(
@@ -1153,17 +1154,27 @@ class _ImageContentState extends State<_ImageContent> {
 
     Widget imageWidget;
     if (widget.message.imageBytes != null) {
-      imageWidget = SizedBox(
-        width: bubbleWidth,
-        height: bubbleHeight,
-        child: Image.memory(
-          widget.message.imageBytes!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            width: bubbleWidth,
-            height: bubbleHeight,
-            color: Colors.grey[300],
-            child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+      imageWidget = GestureDetector(
+        onTap: () {
+          MediaViewerDialog.showImage(
+            context: context,
+            imageBytes: widget.message.imageBytes!,
+            caption: widget.message.text,
+            formattedTime: widget.message.formattedTime,
+          );
+        },
+        child: SizedBox(
+          width: bubbleWidth,
+          height: bubbleHeight,
+          child: Image.memory(
+            widget.message.imageBytes!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              width: bubbleWidth,
+              height: bubbleHeight,
+              color: Colors.grey[300],
+              child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+            ),
           ),
         ),
       );
@@ -1967,6 +1978,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _isPlaying = false;
+  bool _isExpanded = false;
   Duration _currentPosition = Duration.zero;
   Duration _totalDuration = Duration.zero;
   String? _resolvedVideoPath;
@@ -2094,6 +2106,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     super.dispose();
   }
 
+  // ignore: unused_element
   Future<void> _togglePlay() async {
     if (widget.message.videoBytes != null) {
       if (_isInitializing) return;
@@ -2154,17 +2167,38 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     final double innerRadius = widget.platform == Platform.whatsapp ? 6.0 : widget.platformTheme.bubbleRadius;
 
     if (widget.message.isVideoMessage) {
-      // Circular Video Note layout (Screenshot 1 & 2)
+      // Circular Video Note layout (Screenshot 2 & 3)
       final Color activeRingColor = isWhatsApp 
           ? const Color(0xFF25D366) // Green progress circle for WhatsApp
           : (widget.platformTheme.sendButtonColor);
 
+      final double screenWidth = MediaQuery.of(context).size.width;
+      final double maxCircleSize = (screenWidth - 90.0).clamp(160.0, 300.0);
+      final double circleSize = _isExpanded
+          ? maxCircleSize
+          : 190.0.clamp(150.0, maxCircleSize);
+
       // Render circular preview
       Widget circleBody = GestureDetector(
-        onTap: _togglePlay,
-        child: Container(
-          width: 200,
-          height: 200,
+        onTap: () {
+          setState(() {
+            _isExpanded = !_isExpanded;
+          });
+          _togglePlay();
+        },
+        onLongPress: () {
+          MediaViewerDialog.showCircleVideo(
+            context: context,
+            message: widget.message,
+            platform: widget.platform,
+            platformTheme: widget.platformTheme,
+          );
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOutCubic,
+          width: circleSize,
+          height: circleSize,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
             color: Color(0xFF2A2A2A),
@@ -2214,19 +2248,19 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
                         ),
                       ),
 
-                    // Play button overlay when paused and not initializing
-                    if (!_isPlaying && !_isInitializing)
+                    // Play button overlay when paused, not initializing, and in collapsed mode
+                    if (!_isPlaying && !_isInitializing && !_isExpanded)
                       Container(
-                        width: 48,
-                        height: 48,
+                        width: 52,
+                        height: 52,
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
+                          color: Colors.black.withValues(alpha: 0.45),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.play_arrow_rounded,
                           color: Colors.white,
-                          size: 32,
+                          size: 38,
                         ),
                       ),
 
@@ -2351,14 +2385,23 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
       final bool hasCaption = widget.message.text.isNotEmpty;
       final bool shouldOverlayTimestamp = isWhatsApp && !hasCaption;
 
-      Widget videoBody = Container(
-        width: bubbleWidth,
-        height: bubbleHeight,
-        decoration: const BoxDecoration(
-          color: Color(0xFF1E1E1E),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
+      Widget videoBody = GestureDetector(
+        onTap: () {
+          MediaViewerDialog.showVideo(
+            context: context,
+            message: widget.message,
+            platform: widget.platform,
+            platformTheme: widget.platformTheme,
+          );
+        },
+        child: Container(
+          width: bubbleWidth,
+          height: bubbleHeight,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E1E),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
           children: [
             // Frame image or video player
             if (_isInitialized && _controller != null)
@@ -2395,20 +2438,17 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
               ),
 
             // Play overlay button
-            GestureDetector(
-              onTap: _togglePlay,
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 32,
               ),
             ),
 
@@ -2497,7 +2537,8 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
             ),
           ],
         ),
-      );
+      ),
+    );
 
       return ClipRRect(
         borderRadius: BorderRadius.circular(innerRadius),

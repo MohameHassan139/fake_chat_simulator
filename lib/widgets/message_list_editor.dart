@@ -22,18 +22,19 @@ class MessageListEditor extends StatelessWidget {
 
     final platformTheme = PlatformTheme.of(session.platform);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (session.messages.isEmpty) {
       return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.white12),
+            Icon(Icons.chat_bubble_outline_rounded, size: 48, color: isDark ? Colors.white12 : Colors.black12),
             const SizedBox(height: 12),
-            Text(LanguageHelper.translate('no_messages_yet', isAr), style: const TextStyle(color: Colors.white24)),
+            Text(LanguageHelper.translate('no_messages_yet', isAr), style: TextStyle(color: isDark ? Colors.white24 : Colors.black38)),
             const SizedBox(height: 8),
             Text(
               LanguageHelper.translate('use_editor_below', isAr),
-              style: const TextStyle(color: Colors.white12, fontSize: 12),
+              style: TextStyle(color: isDark ? Colors.white12 : Colors.black26, fontSize: 12),
             ),
           ],
         ),
@@ -108,10 +109,10 @@ class _EditableMessageRow extends StatelessWidget {
               index: index,
               child: Container(
                 padding: const EdgeInsets.all(4),
-                child: const Icon(
+                child: Icon(
                   Icons.drag_handle_rounded,
                   size: 16,
-                  color: Colors.white24,
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white24 : Colors.black26,
                 ),
               ),
             ),
@@ -185,10 +186,13 @@ class _MessageContextMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAr = context.watch<ThemeProvider>().isArabic;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white70 : Colors.black87;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
@@ -199,7 +203,7 @@ class _MessageContextMenu extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: isDark ? Colors.white24 : Colors.black12,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -209,17 +213,17 @@ class _MessageContextMenu extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF242424),
+              color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(Icons.chat_bubble_outline, size: 16, color: Colors.white38),
+                Icon(Icons.chat_bubble_outline, size: 16, color: isDark ? Colors.white38 : Colors.black45),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     message.text.isEmpty ? (isAr ? '[مكون]' : '[${message.type.name}]') : message.text,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    style: TextStyle(color: textColor, fontSize: 14),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -292,6 +296,7 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       leading: Container(
         width: 38,
@@ -302,7 +307,7 @@ class _MenuItem extends StatelessWidget {
         ),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 15)),
+      title: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 15)),
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );

@@ -391,10 +391,14 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     final accentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
     final labelColor = Colors.white30;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final containerBg = isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE);
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
       child: SingleChildScrollView(
@@ -407,7 +411,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: isDark ? Colors.white24 : Colors.black12,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -415,7 +419,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             const SizedBox(height: 20),
             Text(
               LanguageHelper.translate(widget.editingMessage != null ? 'edit_message' : 'add_message', context.read<ThemeProvider>().isArabic),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textColor),
             ),
             const SizedBox(height: 20),
 
@@ -425,15 +429,15 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF242424),
+                color: containerBg,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<MessageType>(
                   value: _type,
-                  dropdownColor: const Color(0xFF1E1E1E),
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
+                  dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  style: TextStyle(color: textColor, fontSize: 14),
+                  icon: Icon(Icons.arrow_drop_down, color: isDark ? Colors.white54 : Colors.black54),
                   isExpanded: true,
                   items: MessageType.values.map((type) {
                     return DropdownMenuItem<MessageType>(
@@ -1828,9 +1832,15 @@ class _SLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(
       text,
-      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white38, letterSpacing: 0.5),
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: isDark ? Colors.white38 : Colors.black45,
+        letterSpacing: 0.5,
+      ),
     );
   }
 }
@@ -1852,25 +1862,29 @@ class _SideButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inactiveColor = isDark ? Colors.white38 : Colors.black45;
+    final inactiveBg = isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.15) : const Color(0xFF242424),
+          color: isActive ? color.withValues(alpha: 0.15) : inactiveBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isActive ? color : Colors.transparent),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: isActive ? color : Colors.white38),
+            Icon(icon, size: 18, color: isActive ? color : inactiveColor),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: isActive ? color : Colors.white38,
+                color: isActive ? color : inactiveColor,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -1891,15 +1905,16 @@ class _TimePreset extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => onSelect(DateTime.now().subtract(offset)),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF242424),
+          color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+        child: Text(label, style: TextStyle(color: isDark ? Colors.white38 : Colors.black54, fontSize: 12)),
       ),
     );
   }
@@ -1922,6 +1937,7 @@ class _NumberPickerSimple extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final chatProvider = context.watch<ChatProvider>();
     final session = chatProvider.activeSession;
     final platformTheme = session != null ? PlatformTheme.of(session.platform, isDark: true) : null;
@@ -1929,12 +1945,12 @@ class _NumberPickerSimple extends StatelessWidget {
 
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+        Text(label, style: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 11)),
         const SizedBox(height: 4),
         Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.remove_circle_outline, color: Colors.white38, size: 20),
+              icon: Icon(Icons.remove_circle_outline, color: isDark ? Colors.white38 : Colors.black45, size: 20),
               onPressed: value > min ? () => onChanged(value - 1) : null,
             ),
             SizedBox(
@@ -1942,7 +1958,7 @@ class _NumberPickerSimple extends StatelessWidget {
               child: Text(
                 value.toString().padLeft(2, '0'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             IconButton(

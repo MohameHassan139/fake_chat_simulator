@@ -4,6 +4,12 @@ import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../utils/background_remover_helper.dart';
 
+enum RemovalMode {
+  aiAuto,
+  smartFloodFill,
+  colorKey,
+}
+
 class BackgroundRemoverDialog extends StatefulWidget {
   final Uint8List originalBytes;
 
@@ -17,11 +23,12 @@ class BackgroundRemoverDialog extends StatefulWidget {
 }
 
 class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
+  RemovalMode _mode = RemovalMode.aiAuto;
   late Color _targetColor;
-  double _tolerance = 25.0;
+  double _tolerance = 28.0;
   Uint8List? _processedBytes;
   bool _isProcessing = false;
-  bool _useAuto = true;
+  String? _statusMessage;
 
   final List<Color> _presetColors = [
     Colors.white,
@@ -38,14 +45,53 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
     _processImage();
   }
 
-  void _processImage() {
-    setState(() => _isProcessing = true);
+  Future<void> _processImage() async {
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = null;
+    });
+
+    if (_mode == RemovalMode.aiAuto) {
+      final aiResult = await BackgroundRemoverHelper.removeBackgroundAI(widget.originalBytes);
+      if (mounted) {
+        if (aiResult != null) {
+          setState(() {
+            _processedBytes = aiResult;
+            _isProcessing = false;
+          });
+        } else {
+          // Fallback to Smart Flood Fill if AI mode fails or is unsupported on platform
+          final fallbackResult = BackgroundRemoverHelper.removeBackgroundSmartFloodFill(
+            inputBytes: widget.originalBytes,
+            tolerance: _tolerance,
+          );
+          setState(() {
+            _mode = RemovalMode.smartFloodFill;
+            _processedBytes = fallbackResult;
+            _isProcessing = false;
+            _statusMessage = 'AI model unavailable, switched to Smart Flood-Fill';
+          });
+        }
+      }
+      return;
+    }
+
+    // Run non-AI modes asynchronously using microtask
     Future.microtask(() {
-      final processed = BackgroundRemoverHelper.removeBackground(
-        inputBytes: widget.originalBytes,
-        targetColor: _useAuto ? null : _targetColor,
-        tolerance: _tolerance,
-      );
+      Uint8List processed;
+      if (_mode == RemovalMode.smartFloodFill) {
+        processed = BackgroundRemoverHelper.removeBackgroundSmartFloodFill(
+          inputBytes: widget.originalBytes,
+          tolerance: _tolerance,
+        );
+      } else {
+        processed = BackgroundRemoverHelper.removeBackgroundGlobalColor(
+          inputBytes: widget.originalBytes,
+          targetColor: _targetColor,
+          tolerance: _tolerance,
+        );
+      }
+
       if (mounted) {
         setState(() {
           _processedBytes = processed;
@@ -58,12 +104,15 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
   @override
   Widget build(BuildContext context) {
     final isArabic = context.watch<ThemeProvider>().isArabic;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.white70 : Colors.black54;
 
     return Dialog(
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 680),
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 700),
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -77,15 +126,15 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                 Expanded(
                   child: Text(
                     isArabic ? 'إزالة خلفية الملصق' : 'Remove Sticker Background',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: Icon(Icons.close, color: subTextColor),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -98,7 +147,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white12),
+                  border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
@@ -109,76 +158,107 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                       size: Size.infinite,
                     ),
                     if (_isProcessing)
-                      const CircularProgressIndicator(color: Color(0xFF25D366))
+                      Container(
+                        color: Colors.black45,
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Color(0xFF25D366)),
+                        ),
+                      )
                     else if (_processedBytes != null)
-                      Image.memory(_processedBytes!, fit: BoxFit.contain)
+                      Image.memory(
+                        _processedBytes!,
+                        fit: BoxFit.contain,
+                      )
                     else
                       Image.memory(widget.originalBytes, fit: BoxFit.contain),
                   ],
                 ),
               ),
             ),
+            if (_statusMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _statusMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: isDark ? Colors.amberAccent : Colors.deepOrange, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 16),
 
-            // Mode selector: Auto vs Manual Color
-            Row(
-              children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: Text(isArabic ? 'تلقائي (الزوايا)' : 'Auto Detect'),
-                    selected: _useAuto,
+            // Mode Selector: AI Auto vs Smart Flood-Fill vs Key Color
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    avatar: Icon(Icons.psychology_rounded, size: 18, color: _mode == RemovalMode.aiAuto ? Colors.black : textColor),
+                    label: Text(isArabic ? 'ذكاء اصطناعي (تلقائي)' : 'AI Auto'),
+                    selected: _mode == RemovalMode.aiAuto,
                     selectedColor: const Color(0xFF25D366),
-                    backgroundColor: Colors.white10,
+                    backgroundColor: isDark ? Colors.white10 : const Color(0xFFEEEEEE),
                     labelStyle: TextStyle(
-                      color: _useAuto ? Colors.black : Colors.white,
+                      color: _mode == RemovalMode.aiAuto ? Colors.black : textColor,
                       fontWeight: FontWeight.bold,
                     ),
                     onSelected: (val) {
                       if (val) {
-                        setState(() {
-                          _useAuto = true;
-                        });
+                        setState(() => _mode = RemovalMode.aiAuto);
                         _processImage();
                       }
                     },
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ChoiceChip(
-                    label: Text(isArabic ? 'تحديد اللون' : 'Key Color'),
-                    selected: !_useAuto,
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    avatar: Icon(Icons.border_outer_rounded, size: 18, color: _mode == RemovalMode.smartFloodFill ? Colors.black : textColor),
+                    label: Text(isArabic ? 'إزالة حدود (ذكي)' : 'Smart Flood-Fill'),
+                    selected: _mode == RemovalMode.smartFloodFill,
                     selectedColor: const Color(0xFF25D366),
-                    backgroundColor: Colors.white10,
+                    backgroundColor: isDark ? Colors.white10 : const Color(0xFFEEEEEE),
                     labelStyle: TextStyle(
-                      color: !_useAuto ? Colors.black : Colors.white,
+                      color: _mode == RemovalMode.smartFloodFill ? Colors.black : textColor,
                       fontWeight: FontWeight.bold,
                     ),
                     onSelected: (val) {
                       if (val) {
-                        setState(() {
-                          _useAuto = false;
-                        });
+                        setState(() => _mode = RemovalMode.smartFloodFill);
                         _processImage();
                       }
                     },
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    avatar: Icon(Icons.color_lens_rounded, size: 18, color: _mode == RemovalMode.colorKey ? Colors.black : textColor),
+                    label: Text(isArabic ? 'تحديد اللون' : 'Color Key'),
+                    selected: _mode == RemovalMode.colorKey,
+                    selectedColor: const Color(0xFF25D366),
+                    backgroundColor: isDark ? Colors.white10 : const Color(0xFFEEEEEE),
+                    labelStyle: TextStyle(
+                      color: _mode == RemovalMode.colorKey ? Colors.black : textColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSelected: (val) {
+                      if (val) {
+                        setState(() => _mode = RemovalMode.colorKey);
+                        _processImage();
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
 
             // Color Presets if Key Color selected
-            if (!_useAuto) ...[
+            if (_mode == RemovalMode.colorKey) ...[
               Text(
                 isArabic ? 'اختر لون الخلفية المراد إزالته:' : 'Select Background Color to Remove:',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                style: TextStyle(color: subTextColor, fontSize: 13),
               ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: _presetColors.map((color) {
-                  final isSelected = _targetColor.value == color.value;
+                  final isSelected = _targetColor == color;
                   return GestureDetector(
                     onTap: () {
                       setState(() {
@@ -194,7 +274,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                         color: color,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? const Color(0xFF25D366) : Colors.white24,
+                          color: isSelected ? const Color(0xFF25D366) : (isDark ? Colors.white24 : Colors.black26),
                           width: isSelected ? 3 : 1,
                         ),
                       ),
@@ -205,38 +285,39 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
               const SizedBox(height: 12),
             ],
 
-            // Tolerance Slider
-            Row(
-              children: [
-                Text(
-                  isArabic ? 'دقة الإزالة:' : 'Sensitivity:',
-                  style: const TextStyle(color: Colors.white, fontSize: 13.5),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _tolerance,
-                    min: 5.0,
-                    max: 80.0,
-                    divisions: 75,
-                    activeColor: const Color(0xFF25D366),
-                    inactiveColor: Colors.white24,
-                    label: '${_tolerance.toInt()}%',
-                    onChanged: (val) {
-                      setState(() {
-                        _tolerance = val;
-                      });
-                    },
-                    onChangeEnd: (val) {
-                      _processImage();
-                    },
+            // Tolerance Slider (for non-AI modes)
+            if (_mode != RemovalMode.aiAuto)
+              Row(
+                children: [
+                  Text(
+                    isArabic ? 'دقة الإزالة:' : 'Sensitivity:',
+                    style: TextStyle(color: textColor, fontSize: 13.5),
                   ),
-                ),
-                Text(
-                  '${_tolerance.toInt()}%',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
+                  Expanded(
+                    child: Slider(
+                      value: _tolerance,
+                      min: 5.0,
+                      max: 80.0,
+                      divisions: 75,
+                      activeColor: const Color(0xFF25D366),
+                      inactiveColor: isDark ? Colors.white24 : Colors.black12,
+                      label: '${_tolerance.toInt()}%',
+                      onChanged: (val) {
+                        setState(() {
+                          _tolerance = val;
+                        });
+                      },
+                      onChangeEnd: (val) {
+                        _processImage();
+                      },
+                    ),
+                  ),
+                  Text(
+                    '${_tolerance.toInt()}%',
+                    style: TextStyle(color: subTextColor, fontSize: 12),
+                  ),
+                ],
+              ),
             const SizedBox(height: 16),
 
             // Save Action Button

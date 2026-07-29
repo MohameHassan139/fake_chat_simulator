@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +14,7 @@ import '../widgets/editor_panel.dart';
 import '../widgets/export_overlay.dart';
 import '../utils/screenshot_helper.dart';
 import '../utils/language_helper.dart';
+import '../widgets/live_setup_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -27,6 +29,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   bool _showEditor = true;
   bool _isWebRecording = false;
   bool _isFullScreenRecordMode = false;
+  bool _isLiveSimMode = false;
+  bool _showExitHint = false;
+  Timer? _liveTimer;
+  int _liveSeconds = 0;
   late AnimationController _panelAnimController;
   late Animation<double> _panelAnimation;
 
@@ -46,8 +52,73 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _liveTimer?.cancel();
     _panelAnimController.dispose();
     super.dispose();
+  }
+
+  void _startLiveSimulation(BuildContext context) {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final session = chatProvider.activeSession;
+    if (session == null) return;
+
+    showDialog(
+      context: context,
+      builder: (_) => LiveSetupDialog(
+        session: session,
+        onStart: ({required speed, required isMuted, required autoRecordWeb}) async {
+          chatProvider.setPlaybackSpeed(speed);
+          if (chatProvider.isMuted != isMuted) {
+            chatProvider.toggleMute();
+          }
+
+          _liveTimer?.cancel();
+          setState(() {
+            _isLiveSimMode = true;
+            _isFullScreenRecordMode = true;
+            _liveSeconds = 0;
+            _showExitHint = true;
+          });
+
+          // Automatically fade out the exit hint toast after 2.5 seconds for 100% clean video recording
+          Future.delayed(const Duration(milliseconds: 2500), () {
+            if (mounted) {
+              setState(() {
+                _showExitHint = false;
+              });
+            }
+          });
+
+          _liveTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+            if (!mounted || !_isLiveSimMode) {
+              timer.cancel();
+              return;
+            }
+            if (!chatProvider.isPlaybackPaused) {
+              setState(() {
+                _liveSeconds++;
+              });
+            }
+          });
+
+          chatProvider.startConversationPlayback(() {
+            // Completed full playback
+          });
+        },
+      ),
+    );
+  }
+
+  void _stopLiveSimulation() {
+    _liveTimer?.cancel();
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider.stopConversationPlayback();
+    setState(() {
+      _isLiveSimMode = false;
+      _isFullScreenRecordMode = false;
+      _showExitHint = false;
+      _liveSeconds = 0;
+    });
   }
 
   void _toggleEditor() {
@@ -141,40 +212,61 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
         autofocus: true,
         onKeyEvent: (FocusNode node, KeyEvent event) {
           if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
-            setState(() {
-              _isFullScreenRecordMode = false;
-              if (_isWebRecording) {
-                _isWebRecording = false;
-                ScreenshotHelper.stopScreenRecord();
-              }
-            });
+            if (_isLiveSimMode) {
+              _stopLiveSimulation();
+            } else {
+              setState(() {
+                _isFullScreenRecordMode = false;
+                if (_isWebRecording) {
+                  _isWebRecording = false;
+                  ScreenshotHelper.stopScreenRecord();
+                }
+              });
+            }
             return KeyEventResult.handled;
           }
           return KeyEventResult.ignored;
         },
         child: GestureDetector(
           onDoubleTap: () {
-            setState(() {
-              _isFullScreenRecordMode = false;
-              if (_isWebRecording) {
-                _isWebRecording = false;
-                ScreenshotHelper.stopScreenRecord();
-              }
-            });
+            if (_isLiveSimMode) {
+              _stopLiveSimulation();
+            } else {
+              setState(() {
+                _isFullScreenRecordMode = false;
+                if (_isWebRecording) {
+                  _isWebRecording = false;
+                  ScreenshotHelper.stopScreenRecord();
+                }
+              });
+            }
           },
-          child: Screenshot(
-            controller: _screenshotController,
-            child: chatProvider.viewChatList
-                ? PlatformInboxViewport(
-                    session: session,
-                    platformTheme: platformTheme,
-                    hideStatusBar: true,
-                  )
-                : ChatViewport(
-                    session: session,
-                    platformTheme: platformTheme,
-                    hideStatusBar: true,
+          child: Stack(
+            children: [
+              Screenshot(
+                controller: _screenshotController,
+                child: chatProvider.viewChatList
+                    ? PlatformInboxViewport(
+                        session: session,
+                        platformTheme: platformTheme,
+                        hideStatusBar: true,
+                      )
+                    : ChatViewport(
+                        session: session,
+                        platformTheme: platformTheme,
+                        hideStatusBar: true,
+                      ),
+              ),
+              if (_isLiveSimMode && _showExitHint)
+                Positioned(
+                  top: 24,
+                  left: 20,
+                  right: 20,
+                  child: Center(
+                    child: _buildExitHintToast(context),
                   ),
+                ),
+            ],
           ),
         ),
       );
@@ -231,6 +323,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       }
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color systemStatusBarBg;
     final Brightness systemStatusBarIconBrightness;
 
@@ -240,17 +333,17 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       systemStatusBarIconBrightness = isLightStatusBarText ? Brightness.light : Brightness.dark;
     } else {
       systemStatusBarBg = Colors.transparent;
-      systemStatusBarIconBrightness = Brightness.light;
+      systemStatusBarIconBrightness = isDark ? Brightness.light : Brightness.dark;
     }
 
     final systemOverlayStyle = SystemUiOverlayStyle(
       statusBarColor: systemStatusBarBg,
       statusBarIconBrightness: systemStatusBarIconBrightness,
       statusBarBrightness: systemStatusBarIconBrightness == Brightness.light ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor: _isFullScreenRecordMode ? platformTheme.statusBarBg : const Color(0xFF0D0D0D),
+      systemNavigationBarColor: _isFullScreenRecordMode ? platformTheme.statusBarBg : Theme.of(context).scaffoldBackgroundColor,
       systemNavigationBarIconBrightness: _isFullScreenRecordMode
           ? (systemStatusBarIconBrightness == Brightness.light ? Brightness.light : Brightness.dark)
-          : Brightness.light,
+          : (isDark ? Brightness.light : Brightness.dark),
     );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -270,7 +363,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           }
         },
         child: Scaffold(
-          backgroundColor: _isFullScreenRecordMode ? platformTheme.statusBarBg : const Color(0xFF0D0D0D),
+          backgroundColor: _isFullScreenRecordMode ? platformTheme.statusBarBg : Theme.of(context).scaffoldBackgroundColor,
           body: SafeArea(
             child: bodyContent,
           ),
@@ -282,20 +375,21 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
 
   Widget _buildRecordingHUD(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isAr = context.read<ThemeProvider>().isArabic;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
+            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
             blurRadius: 15,
             spreadRadius: 2,
           ),
         ],
-        border: Border.all(color: const Color(0xFF333333)),
+        border: Border.all(color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0)),
       ),
       child: Row(
         children: [
@@ -323,8 +417,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               children: [
                 Text(
                   isAr ? 'يجري تسجيل الشاشة كفيديو...' : 'RECORDING VIDEO...',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -332,7 +426,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 ),
                 Text(
                   isAr ? 'يجري تسجيل الشاشة حاليًا' : 'Recording the simulator screen as video...',
-                  style: const TextStyle(color: Colors.white54, fontSize: 10),
+                  style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 10),
                 ),
               ],
             ),
@@ -360,38 +454,61 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
   Widget _buildTopBar(BuildContext context, ChatSession session) {
     final chatProvider = context.watch<ChatProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D0D0D),
-        border: Border(bottom: BorderSide(color: Color(0xFF1A1A1A))),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFE2E2E2))),
       ),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 20),
+            icon: Icon(Icons.arrow_back_ios_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
           Container(
             width: 8,
             height: 8,
-            margin: const EdgeInsets.only(right: 8),
+            margin: const EdgeInsets.only(right: 6),
             decoration: BoxDecoration(
               color: session.platformColor,
               shape: BoxShape.circle,
             ),
           ),
-          Text(
-            session.platformName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              session.platformName,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 4),
+          // App Theme Toggle
+          GestureDetector(
+            onTap: themeProvider.toggleTheme,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                size: 18,
+                color: isDark ? Colors.amber : const Color(0xFF6C63FF),
+              ),
+            ),
+          ),
           // Inbox toggle
           GestureDetector(
             onTap: () {
@@ -399,23 +516,23 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             },
             child: Container(
               padding: const EdgeInsets.all(6),
-              margin: const EdgeInsets.only(right: 8),
+              margin: const EdgeInsets.only(right: 6),
               decoration: BoxDecoration(
                 color: chatProvider.viewChatList
                     ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
-                    : const Color(0xFF242424),
+                    : (isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 chatProvider.viewChatList ? Icons.chat_bubble_rounded : Icons.forum_rounded,
                 size: 18,
-                color: chatProvider.viewChatList ? const Color(0xFF6C63FF) : Colors.white38,
+                color: chatProvider.viewChatList ? const Color(0xFF6C63FF) : (isDark ? Colors.white38 : Colors.black45),
               ),
             ),
           ),
           // Platform switch
           _PlatformSwitcher(session: session),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           // Toggle editor
           GestureDetector(
             onTap: _toggleEditor,
@@ -424,17 +541,42 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               decoration: BoxDecoration(
                 color: _showEditor
                     ? const Color(0xFF6C63FF).withValues(alpha: 0.2)
-                    : const Color(0xFF242424),
+                    : (isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 _showEditor ? Icons.edit_rounded : Icons.edit_off_rounded,
                 size: 18,
-                color: _showEditor ? const Color(0xFF6C63FF) : Colors.white38,
+                color: _showEditor ? const Color(0xFF6C63FF) : (isDark ? Colors.white38 : Colors.black45),
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
+          // Play Live Chat button
+          GestureDetector(
+            onTap: () => _startLiveSimulation(context),
+            child: Tooltip(
+              message: LanguageHelper.translate('play_live', Provider.of<ThemeProvider>(context, listen: false).isArabic),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00C853), Color(0xFF00E676)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00C853).withValues(alpha: 0.4),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.play_arrow_rounded, size: 18, color: Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
           // Record Chat button
           GestureDetector(
             onTap: () async {
@@ -486,13 +628,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               decoration: BoxDecoration(
                 color: _isWebRecording
                     ? const Color(0xFFE1306C)
-                    : const Color(0xFF242424),
+                    : (isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 _isWebRecording ? Icons.videocam_off_rounded : Icons.videocam_rounded,
                 size: 18,
-                color: _isWebRecording ? Colors.white : Colors.white70,
+                color: _isWebRecording ? Colors.white : (isDark ? Colors.white70 : Colors.black54),
               ),
             ),
           ),
@@ -513,6 +655,196 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       ),
     );
   }
+
+  Widget _buildExitHintToast(BuildContext context) {
+    final isAr = context.read<ThemeProvider>().isArabic;
+    return AnimatedOpacity(
+      opacity: _showExitHint ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 400),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Text(
+          LanguageHelper.translate('double_tap_exit_hint', isAr),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLiveHUD(BuildContext context, ChatProvider chatProvider) {
+    final isAr = context.read<ThemeProvider>().isArabic;
+    final minutes = (_liveSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_liveSeconds % 60).toString().padLeft(2, '0');
+    final timeStr = '$minutes:$seconds';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xEE141414),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+          // Live Pulse Badge
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.3, end: 1.0),
+            duration: const Duration(milliseconds: 600),
+            builder: (context, value, child) {
+              return Opacity(opacity: value, child: child);
+            },
+            onEnd: () {},
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    LanguageHelper.translate('live_badge', isAr),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Timer
+          Text(
+            timeStr,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(width: 1, height: 16, color: Colors.white24),
+          const SizedBox(width: 10),
+
+          // Play/Pause button
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+            icon: Icon(
+              chatProvider.isPlaybackPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            onPressed: () => chatProvider.togglePlaybackPause(),
+            tooltip: chatProvider.isPlaybackPaused ? LanguageHelper.translate('resume', isAr) : LanguageHelper.translate('pause', isAr),
+          ),
+
+          // Speed Toggle (1x, 1.5x, 2x)
+          GestureDetector(
+            onTap: () {
+              double nextSpeed = 1.0;
+              if (chatProvider.playbackSpeed == 1.0) {
+                nextSpeed = 1.5;
+              } else if (chatProvider.playbackSpeed == 1.5) {
+                nextSpeed = 2.0;
+              }
+              chatProvider.setPlaybackSpeed(nextSpeed);
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF333333),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '${chatProvider.playbackSpeed}x',
+                style: const TextStyle(
+                  color: Color(0xFF00E676),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+
+          // Mute / Unmute Sound
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+            icon: Icon(
+              chatProvider.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: chatProvider.isMuted ? Colors.white38 : const Color(0xFF42A5F5),
+              size: 18,
+            ),
+            onPressed: () => chatProvider.toggleMute(),
+            tooltip: chatProvider.isMuted ? LanguageHelper.translate('unmute', isAr) : LanguageHelper.translate('mute', isAr),
+          ),
+
+          // Replay Button
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+            icon: const Icon(Icons.replay_rounded, color: Colors.white70, size: 18),
+            onPressed: () {
+              chatProvider.stopConversationPlayback();
+              _startLiveSimulation(context);
+            },
+            tooltip: LanguageHelper.translate('replay', isAr),
+          ),
+
+          // Exit Button
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+            icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+            onPressed: _stopLiveSimulation,
+            tooltip: LanguageHelper.translate('stop_live', isAr),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildPhoneFrame(
     BuildContext context,
@@ -652,19 +984,20 @@ class _PlatformSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => _showPlatformPicker(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF242424),
+          color: isDark ? const Color(0xFF242424) : const Color(0xFFEEEEEE),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
             Icon(_icon(session.platform), size: 14, color: session.platformColor),
             const SizedBox(width: 4),
-            const Icon(Icons.swap_horiz_rounded, size: 14, color: Colors.white38),
+            Icon(Icons.swap_horiz_rounded, size: 14, color: isDark ? Colors.white38 : Colors.black45),
           ],
         ),
       ),

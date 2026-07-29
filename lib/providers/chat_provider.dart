@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/chat_models.dart';
+import '../utils/sound_effect_helper.dart';
 
 const _uuid = Uuid();
 
@@ -19,6 +20,9 @@ class ChatProvider extends ChangeNotifier {
   String? _simulatedContactStatus;
   bool _showSimulatedTypingIndicator = false;
   bool _shouldStopPlayback = false;
+  double _playbackSpeed = 1.0;
+  bool _isPlaybackPaused = false;
+  bool _isMuted = true;
 
   List<ChatSession> get sessions => List.unmodifiable(_sessions);
   ChatSession? get activeSession => _activeSession;
@@ -30,6 +34,9 @@ class ChatProvider extends ChangeNotifier {
   String? get simulatedTypingText => _simulatedTypingText;
   String? get simulatedContactStatus => _simulatedContactStatus;
   bool get showSimulatedTypingIndicator => _showSimulatedTypingIndicator;
+  double get playbackSpeed => _playbackSpeed;
+  bool get isPlaybackPaused => _isPlaybackPaused;
+  bool get isMuted => _isMuted;
 
   ChatProvider() {
     _loadFromDatabase();
@@ -427,12 +434,42 @@ class ChatProvider extends ChangeNotifier {
     return [];
   }
 
-  // ─── Automated Playback Simulator ──────────────────────────────────────────
+  // ─── Automated Live Playback Simulator ────────────────────────────────────
+
+  void setPlaybackSpeed(double speed) {
+    _playbackSpeed = speed;
+    notifyListeners();
+  }
+
+  void togglePlaybackPause() {
+    _isPlaybackPaused = !_isPlaybackPaused;
+    notifyListeners();
+  }
+
+  void toggleMute() {
+    _isMuted = !_isMuted;
+    SoundEffectHelper.isMuted = _isMuted;
+    notifyListeners();
+  }
+
+  Future<void> _waitDelay(int milliseconds) async {
+    int remaining = (milliseconds / _playbackSpeed).round();
+    while (remaining > 0) {
+      if (_shouldStopPlayback) break;
+      if (_isPlaybackPaused) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        continue;
+      }
+      await Future.delayed(const Duration(milliseconds: 40));
+      remaining -= 40;
+    }
+  }
 
   Future<void> startConversationPlayback(VoidCallback onDone) async {
     if (_activeSession == null || _isPlayingConversation) return;
     _isPlayingConversation = true;
     _shouldStopPlayback = false;
+    _isPlaybackPaused = false;
     _simulatedMessages = [];
     _simulatedTypingText = null;
     _simulatedContactStatus = null;
@@ -454,22 +491,31 @@ class ChatProvider extends ChangeNotifier {
 
       // Typing speed based on message length
       final typingDelayMs = msg.text.isNotEmpty 
-          ? (msg.text.length * 50).clamp(800, 2500)
-          : 1200;
+          ? (msg.text.length * 45).clamp(700, 2200)
+          : 1000;
 
       if (!msg.isSender) {
-        // RECEIVER: Shows typing indicator and adds message
+        // RECEIVER: Shows typing indicator and adds message with sound
         _simulatedContactStatus = 'typing...';
         _showSimulatedTypingIndicator = true;
         notifyListeners();
 
-        await Future.delayed(Duration(milliseconds: typingDelayMs));
+        await _waitDelay(typingDelayMs);
         if (_shouldStopPlayback) break;
 
         _simulatedContactStatus = 'online';
         _showSimulatedTypingIndicator = false;
         _simulatedMessages!.add(msg);
         notifyListeners();
+
+        // Sound effect & Audio message auto playback
+        if (!_isMuted) {
+          if (msg.type == MessageType.audio && msg.audioBytes != null) {
+            await SoundEffectHelper.playAudioMessageBytes(msg.audioBytes!);
+          } else {
+            await SoundEffectHelper.playIncomingSound(_activeSession!.platform);
+          }
+        }
 
       } else {
         // SENDER: Animates character typing, then displays bubble with status ticks
@@ -479,35 +525,44 @@ class ChatProvider extends ChangeNotifier {
 
         for (int i = 0; i < fullText.length; i++) {
           if (_shouldStopPlayback) break;
-          await Future.delayed(const Duration(milliseconds: 50));
+          await _waitDelay(45);
           _simulatedTypingText = fullText.substring(0, i + 1);
           notifyListeners();
         }
 
         if (_shouldStopPlayback) break;
-        await Future.delayed(const Duration(milliseconds: 200));
+        await _waitDelay(180);
 
         _simulatedTypingText = null;
         final sendingMsg = msg.copyWith(status: MessageStatus.sending);
         _simulatedMessages!.add(sendingMsg);
         notifyListeners();
 
+        // Play outgoing sound effect
+        if (!_isMuted) {
+          if (msg.type == MessageType.audio && msg.audioBytes != null) {
+            await SoundEffectHelper.playAudioMessageBytes(msg.audioBytes!);
+          } else {
+            await SoundEffectHelper.playOutgoingSound(_activeSession!.platform);
+          }
+        }
+
         // Tick Progression
-        await Future.delayed(const Duration(milliseconds: 400));
+        await _waitDelay(350);
         if (_shouldStopPlayback) break;
         _updateSimulatedMessageStatus(msg.id, MessageStatus.sent);
 
-        await Future.delayed(const Duration(milliseconds: 500));
+        await _waitDelay(400);
         if (_shouldStopPlayback) break;
         _updateSimulatedMessageStatus(msg.id, MessageStatus.delivered);
 
-        await Future.delayed(const Duration(milliseconds: 500));
+        await _waitDelay(400);
         if (_shouldStopPlayback) break;
         _updateSimulatedMessageStatus(msg.id, MessageStatus.read);
       }
 
       // Read interval
-      await Future.delayed(const Duration(milliseconds: 1200));
+      await _waitDelay(1000);
     }
 
     _isPlayingConversation = false;
@@ -532,6 +587,7 @@ class ChatProvider extends ChangeNotifier {
   void stopConversationPlayback() {
     _shouldStopPlayback = true;
     _isPlayingConversation = false;
+    _isPlaybackPaused = false;
     _simulatedMessages = null;
     _simulatedTypingText = null;
     _simulatedContactStatus = null;
