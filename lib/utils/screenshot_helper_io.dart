@@ -43,7 +43,8 @@ Future<void> shareImage(Uint8List bytes, String fileName) async {
     await file.writeAsBytes(bytes);
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'image/png')],
-      text: 'Created with FakeChatStudio',
+      text: 'Made with Fake Chat Simulator 😂 '
+          'https://play.google.com/store/apps/details?id=com.mohamedhassan.fakechatsimulator',
     );
   } catch (e) {
     debugPrint('Share error: $e');

@@ -9,18 +9,17 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 /// screen, so screenshots stay clean) and an interstitial after a saved
 /// screenshot, at most every 2nd save and 2 minutes apart.
 ///
-/// The IDs below are Google's public TEST ids. Before the store release,
-/// replace them with the real ones from AdMob (Apps > Fake Chat > Ad units),
-/// and the APPLICATION_ID in AndroidManifest.xml.
+/// Real AdMob ids (app ca-app-pub-2509095132117735~9332794603). Debug builds
+/// always get Google's TEST ids: tapping real ads on our own phones counts as
+/// invalid traffic and can close the AdMob account.
 class AdIds {
-  static const bool useTestAds = true;
+  static const bool useTestAds = kDebugMode;
 
   static const String _testBanner = 'ca-app-pub-3940256099942544/6300978111';
   static const String _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
 
-  // Real ids (ca-app-pub-2509095132117735/...) go here.
-  static const String _banner = _testBanner;
-  static const String _interstitial = _testInterstitial;
+  static const String _banner = 'ca-app-pub-2509095132117735/2090114233';
+  static const String _interstitial = 'ca-app-pub-2509095132117735/8220583328';
 
   static String get banner => useTestAds ? _testBanner : _banner;
   static String get interstitial => useTestAds ? _testInterstitial : _interstitial;

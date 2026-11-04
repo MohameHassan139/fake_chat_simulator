@@ -16,6 +16,7 @@ import '../utils/screenshot_helper.dart';
 import '../utils/language_helper.dart';
 import '../widgets/live_setup_dialog.dart';
 import '../services/ad_service.dart';
+import '../services/review_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -164,7 +165,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     ? '$baseMsg: $savedPath'
                     : baseMsg;
 
-                if (success) AdService.instance.afterSave();
+                if (success) {
+                  // the rating dialog first when it is due; never an ad on top of it
+                  ReviewService.instance.afterSave().then((asked) {
+                    if (!asked) AdService.instance.afterSave();
+                  });
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(finalMsg),
