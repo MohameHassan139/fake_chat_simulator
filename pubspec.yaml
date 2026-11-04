@@ -1,7 +1,7 @@
 name: fake_chat_simulator
 description: A pixel-perfect fake chat simulator supporting WhatsApp, Messenger, Instagram, and Snapchat.
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -51,6 +51,7 @@ dependencies:
   file_picker: ^8.1.7
   image: ^4.2.0
   image_background_remover: ^2.0.1
+  google_mobile_ads: ^9.0.0
 
 dev_dependencies:
   flutter_test:

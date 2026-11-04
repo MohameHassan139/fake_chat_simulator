@@ -15,6 +15,7 @@ import '../widgets/export_overlay.dart';
 import '../utils/screenshot_helper.dart';
 import '../utils/language_helper.dart';
 import '../widgets/live_setup_dialog.dart';
+import '../services/ad_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -163,6 +164,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     ? '$baseMsg: $savedPath'
                     : baseMsg;
 
+                if (success) AdService.instance.afterSave();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(finalMsg),

@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'providers/chat_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/dashboard_screen.dart';
+import 'services/ad_service.dart';
 import 'themes/app_theme.dart';
 
 void main() async {
@@ -19,6 +20,7 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   runApp(const FakeChatSimulatorApp());
+  AdService.instance.init();             // consent + ads in the background, never blocks the start
 }
 
 class FakeChatSimulatorApp extends StatelessWidget {

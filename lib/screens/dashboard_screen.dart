@@ -5,6 +5,7 @@ import '../providers/chat_provider.dart';
 import '../providers/theme_provider.dart';
 import '../utils/language_helper.dart';
 import 'chat_screen.dart';
+import '../services/ad_service.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -65,6 +66,7 @@ class DashboardScreen extends StatelessWidget {
           ? _buildEmptyState(context)
           : _buildSessionList(context, chatProvider),
       floatingActionButton: _buildFAB(context),
+      bottomNavigationBar: const AdBanner(),
     );
   }
 
