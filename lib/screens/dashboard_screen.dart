@@ -6,6 +6,11 @@ import '../providers/theme_provider.dart';
 import '../utils/language_helper.dart';
 import 'chat_screen.dart';
 import '../services/ad_service.dart';
+import '../services/purchase_service.dart';
+import 'fake_call_screen.dart';
+import '../services/daily_prank.dart';
+import '../services/feedback.dart';
+import 'package:uuid/uuid.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -43,16 +48,17 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          TextButton(
-            child: Text(
-              themeProvider.isArabic ? 'English' : 'عربي',
-              style: const TextStyle(
-                color: Color(0xFF6C63FF),
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+          IconButton(
+            tooltip: LanguageHelper.translate('fake_call', themeProvider.isArabic),
+            icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF6C63FF)),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const FakeCallScreen()),
             ),
-            onPressed: themeProvider.toggleLanguage,
+          ),
+          IconButton(
+            tooltip: LanguageHelper.translate('language', themeProvider.isArabic),
+            icon: const Icon(Icons.translate_rounded),
+            onPressed: () => _chooseLanguage(context),
           ),
           IconButton(
             icon: Icon(
@@ -60,6 +66,7 @@ class DashboardScreen extends StatelessWidget {
             ),
             onPressed: themeProvider.toggleTheme,
           ),
+          const _MoreMenu(),
         ],
       ),
       body: chatProvider.sessions.isEmpty
@@ -67,6 +74,31 @@ class DashboardScreen extends StatelessWidget {
           : _buildSessionList(context, chatProvider),
       floatingActionButton: _buildFAB(context),
       bottomNavigationBar: const AdBanner(),
+    );
+  }
+
+  void _chooseLanguage(BuildContext context) {
+    final themeProvider = context.read<ThemeProvider>();
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final e in LanguageHelper.languages.entries)
+              ListTile(
+                title: Text(e.value),
+                trailing: themeProvider.language == e.key
+                    ? const Icon(Icons.check_rounded, color: Color(0xFF6C63FF))
+                    : null,
+                onTap: () {
+                  themeProvider.setLanguage(e.key);
+                  Navigator.pop(ctx);
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -114,6 +146,8 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           _buildPlatformCards(context),
+          const SizedBox(height: 24),
+          const _PrankOfTheDayCard(),
         ],
       ),
     );
@@ -136,6 +170,7 @@ class DashboardScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const _PrankOfTheDayCard(),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
           child: Text(
@@ -510,3 +545,218 @@ class _PlatformChip extends StatelessWidget {
   }
 }
 
+
+/// Remove ads (with the store price), restore it, and the EEA/UK privacy form.
+class _MoreMenu extends StatefulWidget {
+  const _MoreMenu();
+
+  @override
+  State<_MoreMenu> createState() => _MoreMenuState();
+}
+
+class _MoreMenuState extends State<_MoreMenu> {
+  bool _privacy = false;
+  bool _reminder = false;
+
+  @override
+  void initState() {
+    super.initState();
+    DailyPrank.instance.reminderOn().then((v) {
+      if (mounted) setState(() => _reminder = v);
+    });
+    AdService.instance.privacyOptionsRequired().then((v) {
+      if (mounted) setState(() => _privacy = v);
+    });
+  }
+
+  void _say(String key) {
+    final isAr = context.read<ThemeProvider>().isArabic;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(LanguageHelper.translate(key, isAr)), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = context.watch<ThemeProvider>().isArabic;
+    String t(String key) => LanguageHelper.translate(key, isAr);
+    final purchases = PurchaseService.instance;
+    return ValueListenableBuilder<bool>(
+      valueListenable: AdService.instance.adsRemovedNotifier,
+      builder: (context, removed, _) => PopupMenuButton<String>(
+        onSelected: (v) async {
+          if (v == 'remove') {
+            if (!purchases.canBuy || !await purchases.buy()) _say('store_unavailable');
+          } else if (v == 'restore') {
+            if (purchases.canBuy) {
+              await purchases.restore();
+            } else {
+              _say('store_unavailable');
+            }
+          } else if (v == 'privacy') {
+            AdService.instance.showPrivacyOptions();
+          } else if (v == 'reminder') {
+            await DailyPrank.instance.setReminder(!_reminder, isAr);
+            final on = await DailyPrank.instance.reminderOn();
+            if (mounted) setState(() => _reminder = on);
+          } else if (v == 'feedback') {
+            await AppFeedback.send(isAr);
+          }
+        },
+        itemBuilder: (_) => [
+          if (!removed)
+            PopupMenuItem(
+              value: 'remove',
+              child: ValueListenableBuilder<String?>(
+                valueListenable: purchases.price,
+                builder: (_, price, __) => Text(price == null ? t('remove_ads') : '${t('remove_ads')} ($price)'),
+              ),
+            ),
+          if (removed) PopupMenuItem(enabled: false, child: Text(t('remove_ads_done'))),
+          if (!removed) PopupMenuItem(value: 'restore', child: Text(t('restore_purchase'))),
+          PopupMenuItem(
+            value: 'reminder',
+            child: Text('${t('daily_reminder')}: ${_reminder ? '✓' : '✗'}'),
+          ),
+          if (AppFeedback.available) PopupMenuItem(value: 'feedback', child: Text(t('send_feedback'))),
+          if (_privacy) PopupMenuItem(value: 'privacy', child: Text(t('privacy_settings'))),
+        ],
+      ),
+    );
+  }
+}
+
+/// Today's ready-made prank chat: one tap, choose the app, then edit and share.
+class _PrankOfTheDayCard extends StatelessWidget {
+  const _PrankOfTheDayCard();
+
+  Future<void> _use(BuildContext context) async {
+    final isAr = context.read<ThemeProvider>().isArabic;
+    final platform = await showModalBottomSheet<Platform>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(LanguageHelper.translate('choose_platform', isAr),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final p in Platform.values)
+                    ActionChip(
+                      avatar: _PlatformLogo(platform: p),
+                      label: Text(_platformName(p)),
+                      onPressed: () => Navigator.pop(ctx, p),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (platform == null || !context.mounted) return;
+    final t = DailyPrank.instance.today;
+    final now = DateTime.now();
+    final lines = t.lines;
+    context.read<ChatProvider>().createSessionCustom(
+      platform: platform,
+      contactName: DailyPrank.text(isAr, t.contactAr, t.contactEn),
+      initialMessages: [
+        for (var i = 0; i < lines.length; i++)
+          ChatMessage(
+            id: const Uuid().v4(),
+            text: DailyPrank.text(isAr, lines[i].ar, lines[i].en),
+            type: MessageType.text,
+            isSender: lines[i].me,
+            timestamp: now.subtract(Duration(minutes: lines.length - i)),
+            status: MessageStatus.read,
+          ),
+      ],
+    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
+    DailyPrank.instance.offerReminderOnce(isAr);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = context.watch<ThemeProvider>().isArabic;
+    final t = DailyPrank.instance.today;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Material(
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFFFF6584)]),
+          ),
+          child: InkWell(
+            onTap: () => _use(context),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Text('🎭', style: TextStyle(fontSize: 32)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(LanguageHelper.translate('prank_of_day', isAr),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(DailyPrank.text(isAr, t.titleAr, t.titleEn),
+                            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                    child: Text(LanguageHelper.translate('use_it', isAr),
+                        style: const TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _platformName(Platform p) {
+  switch (p) {
+    case Platform.whatsapp: return 'WhatsApp';
+    case Platform.messenger: return 'Messenger';
+    case Platform.instagram: return 'Instagram';
+    case Platform.snapchat: return 'Snapchat';
+  }
+}
+
+class _PlatformLogo extends StatelessWidget {
+  final Platform platform;
+  const _PlatformLogo({required this.platform});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (platform) {
+      case Platform.whatsapp:
+        return const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18);
+      case Platform.messenger:
+        return const Icon(Icons.messenger_rounded, color: Color(0xFF0084FF), size: 18);
+      case Platform.instagram:
+        return const Icon(Icons.camera_alt_rounded, color: Color(0xFFE1306C), size: 18);
+      case Platform.snapchat:
+        return const Icon(Icons.face_rounded, color: Color(0xFFFFD600), size: 18);
+    }
+  }
+}

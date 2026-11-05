@@ -313,7 +313,7 @@ class ChatViewport extends StatelessWidget {
       return timeStr;
     }
     
-    final comma = isArabic ? '، ' : ', ';
+    final comma = LanguageHelper.pick(isArabic, '، ', ', ');
     
     if (isYesterday) {
       return '${LanguageHelper.translate('yesterday', isArabic)}$comma$timeStr';
@@ -338,8 +338,8 @@ class ChatViewport extends StatelessWidget {
     final hour = dt.hour;
     final minute = dt.minute.toString().padLeft(2, '0');
     final period = hour >= 12 
-        ? (isArabic ? 'م' : 'PM') 
-        : (isArabic ? 'ص' : 'AM');
+        ? (LanguageHelper.pick(isArabic, 'م', 'PM')) 
+        : (LanguageHelper.pick(isArabic, 'ص', 'AM'));
     final formattedHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
     return '$formattedHour:$minute $period';
   }
@@ -364,7 +364,7 @@ class ChatViewport extends StatelessWidget {
               border: Border.all(color: isDark ? Colors.transparent : const Color(0xFFF0E0C0), width: 0.8),
             ),
             child: Text(
-              isAr ? 'لقد حظرت جهة الاتصال هذه. انقر لإلغاء الحظر.' : 'You blocked this contact. Tap to unblock.',
+              LanguageHelper.pick(isAr, 'لقد حظرت جهة الاتصال هذه. انقر لإلغاء الحظر.', 'You blocked this contact. Tap to unblock.'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: textCol,
@@ -479,9 +479,7 @@ class _ProfileHeaderCard extends StatelessWidget {
       final bool isAr = context.read<ThemeProvider>().isArabic;
       // Centered WhatsApp encryption log pill card
       final String text = session.contactBio ??
-          (isAr
-              ? 'الرسائل والمكالمات مشفرة تمامًا بين الطرفين. لا يمكن لأحد خارج هذه المحادثة، ولا حتى واتساب، قراءتها أو الاستماع إليها. انقر للمزيد.'
-              : 'Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them. Tap to learn more.');
+          (LanguageHelper.pick(isAr, 'الرسائل والمكالمات مشفرة تمامًا بين الطرفين. لا يمكن لأحد خارج هذه المحادثة، ولا حتى واتساب، قراءتها أو الاستماع إليها. انقر للمزيد.', 'Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them. Tap to learn more.'));
       final Color cardBg = isDark ? const Color(0xFF182229) : const Color(0xFFFFEECD);
       final Color textCol = isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F);
       final Color lockCol = isDark ? const Color(0xFF00A884) : const Color(0xFF54656F);
@@ -705,14 +703,14 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
         backgroundColor: bg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         content: Text(
-          isAr ? 'هل تريد إلغاء حظر ${session.contactUser.name}؟' : 'Unblock ${session.contactUser.name}?',
+          LanguageHelper.pick(isAr, 'هل تريد إلغاء حظر ${session.contactUser.name}؟', 'Unblock ${session.contactUser.name}?'),
           style: TextStyle(color: textCol, fontSize: 16),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
-              isAr ? 'إلغاء' : 'CANCEL',
+              LanguageHelper.pick(isAr, 'إلغاء', 'CANCEL'),
               style: TextStyle(color: actionCol, fontWeight: FontWeight.bold),
             ),
           ),
@@ -722,7 +720,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
               Navigator.pop(ctx);
             },
             child: Text(
-              isAr ? 'إلغاء الحظر' : 'UNBLOCK',
+              LanguageHelper.pick(isAr, 'إلغاء الحظر', 'UNBLOCK'),
               style: TextStyle(color: actionCol, fontWeight: FontWeight.bold),
             ),
           ),

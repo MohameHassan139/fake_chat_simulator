@@ -14,6 +14,7 @@ import '../themes/platform_themes.dart';
 import '../providers/theme_provider.dart';
 import '../providers/chat_provider.dart';
 import 'media_fullscreen_viewer.dart';
+import '../utils/language_helper.dart';
 
 bool _isArabic(String text) {
   final arabicRegExp = RegExp(
@@ -647,7 +648,7 @@ class MessageBubble extends StatelessWidget {
             const SizedBox(width: 12),
             // Call Back Action Text
             Text(
-              isArabic ? 'معاودة الاتصال' : 'Call Back',
+              LanguageHelper.pick(isArabic, 'معاودة الاتصال', 'Call Back'),
               style: const TextStyle(
                 color: Color(0xFF0095F6),
                 fontSize: 13,
@@ -736,7 +737,7 @@ class MessageBubble extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  isArabic ? 'معاودة الاتصال' : 'Call Back',
+                  LanguageHelper.pick(isArabic, 'معاودة الاتصال', 'Call Back'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: textCol,
@@ -3104,12 +3105,12 @@ class _ReplyPreviewHeader extends StatelessWidget {
             mediaIcon = Icons.attachment_rounded;
             displayText = repliedToMessage.text.isNotEmpty
                 ? repliedToMessage.text
-                : (isArabicLocale ? 'مرفق' : 'Attachment');
+                : (LanguageHelper.pick(isArabicLocale, 'مرفق', 'Attachment'));
           } else {
             mediaIcon = Icons.camera_alt_rounded;
             displayText = repliedToMessage.text.isNotEmpty
                 ? repliedToMessage.text
-                : (isArabicLocale ? 'صورة' : 'Photo');
+                : (LanguageHelper.pick(isArabicLocale, 'صورة', 'Photo'));
           }
           break;
         case MessageType.video:
@@ -3117,23 +3118,23 @@ class _ReplyPreviewHeader extends StatelessWidget {
             mediaIcon = Icons.attachment_rounded;
             displayText = repliedToMessage.text.isNotEmpty
                 ? repliedToMessage.text
-                : (isArabicLocale ? 'مرفق' : 'Attachment');
+                : (LanguageHelper.pick(isArabicLocale, 'مرفق', 'Attachment'));
           } else {
             mediaIcon = Icons.videocam_rounded;
             final durationStr = formatReplyAudioDuration(repliedToMessage.audioDuration);
             displayText = repliedToMessage.text.isNotEmpty
                 ? '${repliedToMessage.text}$durationStr'
-                : '${isArabicLocale ? 'مقطع فيديو' : 'Video'}$durationStr';
+                : '${LanguageHelper.pick(isArabicLocale, 'مقطع فيديو', 'Video')}$durationStr';
           }
           break;
         case MessageType.audio:
           if (isMessengerOrInstagram) {
             mediaIcon = Icons.attachment_rounded;
-            displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+            displayText = LanguageHelper.pick(isArabicLocale, 'مرفق', 'Attachment');
           } else {
             mediaIcon = repliedToMessage.isVoiceNote ? Icons.mic_rounded : Icons.audiotrack_rounded;
             final durationStr = formatReplyAudioDuration(repliedToMessage.audioDuration);
-            final typeLabel = isArabicLocale ? 'رسالة صوتية' : 'Voice message';
+            final typeLabel = LanguageHelper.pick(isArabicLocale, 'رسالة صوتية', 'Voice message');
             displayText = '$typeLabel$durationStr';
           }
           break;
@@ -3146,26 +3147,26 @@ class _ReplyPreviewHeader extends StatelessWidget {
       if (lowerText.contains('[image]') || lowerText.contains('[photo]') || lowerText.contains('صورة')) {
         if (isMessengerOrInstagram) {
           mediaIcon = Icons.attachment_rounded;
-          displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+          displayText = LanguageHelper.pick(isArabicLocale, 'مرفق', 'Attachment');
         } else {
           mediaIcon = Icons.camera_alt_rounded;
-          displayText = isArabicLocale ? 'صورة' : 'Photo';
+          displayText = LanguageHelper.pick(isArabicLocale, 'صورة', 'Photo');
         }
       } else if (lowerText.contains('[video]') || lowerText.contains('فيديو') || lowerText.contains('مقطع')) {
         if (isMessengerOrInstagram) {
           mediaIcon = Icons.attachment_rounded;
-          displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+          displayText = LanguageHelper.pick(isArabicLocale, 'مرفق', 'Attachment');
         } else {
           mediaIcon = Icons.videocam_rounded;
-          displayText = isArabicLocale ? 'فيديو' : 'Video';
+          displayText = LanguageHelper.pick(isArabicLocale, 'فيديو', 'Video');
         }
       } else if (lowerText.contains('[audio]') || lowerText.contains('[voice]') || lowerText.contains('صوتية') || lowerText.contains('صوتي')) {
         if (isMessengerOrInstagram) {
           mediaIcon = Icons.attachment_rounded;
-          displayText = isArabicLocale ? 'مرفق' : 'Attachment';
+          displayText = LanguageHelper.pick(isArabicLocale, 'مرفق', 'Attachment');
         } else {
           mediaIcon = Icons.mic_rounded;
-          displayText = isArabicLocale ? 'رسالة صوتية' : 'Voice note';
+          displayText = LanguageHelper.pick(isArabicLocale, 'رسالة صوتية', 'Voice note');
         }
       }
     }
@@ -3425,7 +3426,7 @@ class _ForwardedHeader extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            isArabic ? 'مُحوّلة' : 'Forwarded',
+            LanguageHelper.pick(isArabic, 'مُحوّلة', 'Forwarded'),
             style: TextStyle(
               color: greyColor,
               fontSize: 11,
@@ -3444,17 +3445,17 @@ String _getMessengerReplyLabel(bool isSender, String repliedToSenderName, String
   
   if (isSender) {
     if (isQuotedMe) {
-      return isArabic ? 'لقد قمت بالرد على نفسك' : 'You replied to yourself';
+      return LanguageHelper.pick(isArabic, 'لقد قمت بالرد على نفسك', 'You replied to yourself');
     } else {
-      final name = contactName.isNotEmpty ? contactName : (isArabic ? 'الطرف الآخر' : 'Contact');
-      return isArabic ? 'لقد قمت بالرد على $name' : 'You replied to $name';
+      final name = contactName.isNotEmpty ? contactName : (LanguageHelper.pick(isArabic, 'الطرف الآخر', 'Contact'));
+      return LanguageHelper.pick(isArabic, 'لقد قمت بالرد على $name', 'You replied to $name');
     }
   } else {
-    final name = contactName.isNotEmpty ? contactName : (isArabic ? 'الطرف الآخر' : 'Contact');
+    final name = contactName.isNotEmpty ? contactName : (LanguageHelper.pick(isArabic, 'الطرف الآخر', 'Contact'));
     if (isQuotedMe) {
-      return isArabic ? 'تم الرد عليك بواسطة $name' : '$name replied to you';
+      return LanguageHelper.pick(isArabic, 'تم الرد عليك بواسطة $name', '$name replied to you');
     } else {
-      return isArabic ? 'لقد قام $name بالرد على نفسه' : '$name replied to themselves';
+      return LanguageHelper.pick(isArabic, 'لقد قام $name بالرد على نفسه', '$name replied to themselves');
     }
   }
 }

@@ -1,8 +1,10 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../utils/background_remover_helper.dart';
+import '../utils/language_helper.dart';
 
 enum RemovalMode {
   aiAuto,
@@ -61,10 +63,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
           });
         } else {
           // Fallback to Smart Flood Fill if AI mode fails or is unsupported on platform
-          final fallbackResult = BackgroundRemoverHelper.removeBackgroundSmartFloodFill(
-            inputBytes: widget.originalBytes,
-            tolerance: _tolerance,
-          );
+          final fallbackResult = await _offMainThread(RemovalMode.smartFloodFill);
           setState(() {
             _mode = RemovalMode.smartFloodFill;
             _processedBytes = fallbackResult;
@@ -76,29 +75,32 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
       return;
     }
 
-    // Run non-AI modes asynchronously using microtask
-    Future.microtask(() {
-      Uint8List processed;
-      if (_mode == RemovalMode.smartFloodFill) {
-        processed = BackgroundRemoverHelper.removeBackgroundSmartFloodFill(
-          inputBytes: widget.originalBytes,
-          tolerance: _tolerance,
-        );
-      } else {
-        processed = BackgroundRemoverHelper.removeBackgroundGlobalColor(
-          inputBytes: widget.originalBytes,
-          targetColor: _targetColor,
-          tolerance: _tolerance,
-        );
-      }
+    // The pixel loops take seconds on a cheap phone: never on the UI thread
+    // (that froze the app and Android reported it as "not responding").
+    final processed = await _offMainThread(_mode);
+    if (mounted) {
+      setState(() {
+        _processedBytes = processed;
+        _isProcessing = false;
+      });
+    }
+  }
 
-      if (mounted) {
-        setState(() {
-          _processedBytes = processed;
-          _isProcessing = false;
-        });
-      }
-    });
+  Future<Uint8List> _offMainThread(RemovalMode mode) {
+    final bytes = widget.originalBytes;
+    final tolerance = _tolerance;
+    final target = _targetColor;
+    if (mode == RemovalMode.smartFloodFill) {
+      return compute((_) => BackgroundRemoverHelper.removeBackgroundSmartFloodFill(
+            inputBytes: bytes,
+            tolerance: tolerance,
+          ), null);
+    }
+    return compute((_) => BackgroundRemoverHelper.removeBackgroundGlobalColor(
+          inputBytes: bytes,
+          targetColor: target,
+          tolerance: tolerance,
+        ), null);
   }
 
   @override
@@ -125,7 +127,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    isArabic ? 'إزالة خلفية الملصق' : 'Remove Sticker Background',
+                    LanguageHelper.pick(isArabic, 'إزالة خلفية الملصق', 'Remove Sticker Background'),
                     style: TextStyle(
                       color: textColor,
                       fontSize: 18,
@@ -192,7 +194,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                 children: [
                   ChoiceChip(
                     avatar: Icon(Icons.psychology_rounded, size: 18, color: _mode == RemovalMode.aiAuto ? Colors.black : textColor),
-                    label: Text(isArabic ? 'ذكاء اصطناعي (تلقائي)' : 'AI Auto'),
+                    label: Text(LanguageHelper.pick(isArabic, 'ذكاء اصطناعي (تلقائي)', 'AI Auto')),
                     selected: _mode == RemovalMode.aiAuto,
                     selectedColor: const Color(0xFF25D366),
                     backgroundColor: isDark ? Colors.white10 : const Color(0xFFEEEEEE),
@@ -210,7 +212,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                   const SizedBox(width: 8),
                   ChoiceChip(
                     avatar: Icon(Icons.border_outer_rounded, size: 18, color: _mode == RemovalMode.smartFloodFill ? Colors.black : textColor),
-                    label: Text(isArabic ? 'إزالة حدود (ذكي)' : 'Smart Flood-Fill'),
+                    label: Text(LanguageHelper.pick(isArabic, 'إزالة حدود (ذكي)', 'Smart Flood-Fill')),
                     selected: _mode == RemovalMode.smartFloodFill,
                     selectedColor: const Color(0xFF25D366),
                     backgroundColor: isDark ? Colors.white10 : const Color(0xFFEEEEEE),
@@ -228,7 +230,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
                   const SizedBox(width: 8),
                   ChoiceChip(
                     avatar: Icon(Icons.color_lens_rounded, size: 18, color: _mode == RemovalMode.colorKey ? Colors.black : textColor),
-                    label: Text(isArabic ? 'تحديد اللون' : 'Color Key'),
+                    label: Text(LanguageHelper.pick(isArabic, 'تحديد اللون', 'Color Key')),
                     selected: _mode == RemovalMode.colorKey,
                     selectedColor: const Color(0xFF25D366),
                     backgroundColor: isDark ? Colors.white10 : const Color(0xFFEEEEEE),
@@ -251,7 +253,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
             // Color Presets if Key Color selected
             if (_mode == RemovalMode.colorKey) ...[
               Text(
-                isArabic ? 'اختر لون الخلفية المراد إزالته:' : 'Select Background Color to Remove:',
+                LanguageHelper.pick(isArabic, 'اختر لون الخلفية المراد إزالته:', 'Select Background Color to Remove:'),
                 style: TextStyle(color: subTextColor, fontSize: 13),
               ),
               const SizedBox(height: 8),
@@ -290,7 +292,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
               Row(
                 children: [
                   Text(
-                    isArabic ? 'دقة الإزالة:' : 'Sensitivity:',
+                    LanguageHelper.pick(isArabic, 'دقة الإزالة:', 'Sensitivity:'),
                     style: TextStyle(color: textColor, fontSize: 13.5),
                   ),
                   Expanded(
@@ -330,7 +332,7 @@ class _BackgroundRemoverDialogState extends State<BackgroundRemoverDialog> {
               ),
               icon: const Icon(Icons.check_circle_rounded, size: 20),
               label: Text(
-                isArabic ? 'استخدام كملصق شفاف' : 'Use as Transparent Sticker',
+                LanguageHelper.pick(isArabic, 'استخدام كملصق شفاف', 'Use as Transparent Sticker'),
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
               onPressed: () {

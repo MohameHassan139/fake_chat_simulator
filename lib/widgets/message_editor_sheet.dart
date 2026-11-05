@@ -147,18 +147,18 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     
     final isArabicLocale = context.read<ThemeProvider>().isArabic;
     if (isMessengerOrInstagram) {
-      return isArabicLocale ? 'مرفق' : 'Attachment';
+      return LanguageHelper.pick(isArabicLocale, 'مرفق', 'Attachment');
     }
     
     switch (m.type) {
       case MessageType.image:
-        return isArabicLocale ? 'صورة' : 'Photo';
+        return LanguageHelper.pick(isArabicLocale, 'صورة', 'Photo');
       case MessageType.video:
         final durationStr = _formatAudioDuration(m.audioDuration);
-        return isArabicLocale ? 'مقطع فيديو$durationStr' : 'Video$durationStr';
+        return LanguageHelper.pick(isArabicLocale, 'مقطع فيديو$durationStr', 'Video$durationStr');
       case MessageType.audio:
         final durationStr = _formatAudioDuration(m.audioDuration);
-        final label = isArabicLocale ? 'رسالة صوتية' : 'Voice message';
+        final label = LanguageHelper.pick(isArabicLocale, 'رسالة صوتية', 'Voice message');
         return '$label$durationStr';
       default:
         return '[${m.type.name}]';
@@ -352,23 +352,23 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
   String _typeLabel(MessageType t, bool isAr) {
     switch (t) {
-      case MessageType.text: return isAr ? 'رسالة نصية' : 'Text Message';
-      case MessageType.image: return isAr ? 'رسالة صورة' : 'Image Message';
-      case MessageType.sticker: return isAr ? 'ملصق' : 'Sticker';
-      case MessageType.audio: return isAr ? 'رسالة صوتية' : 'Audio Message';
-      case MessageType.video: return isAr ? 'رسالة فيديو' : 'Video Message';
-      case MessageType.voiceCall: return isAr ? 'سجل مكالمة صوتية' : 'Voice Call Record';
-      case MessageType.videoCall: return isAr ? 'سجل مكالمة فيديو' : 'Video Call Record';
-      case MessageType.dateDivider: return isAr ? 'فاصل تاريخ' : 'Date Separator';
+      case MessageType.text: return LanguageHelper.pick(isAr, 'رسالة نصية', 'Text Message');
+      case MessageType.image: return LanguageHelper.pick(isAr, 'رسالة صورة', 'Image Message');
+      case MessageType.sticker: return LanguageHelper.pick(isAr, 'ملصق', 'Sticker');
+      case MessageType.audio: return LanguageHelper.pick(isAr, 'رسالة صوتية', 'Audio Message');
+      case MessageType.video: return LanguageHelper.pick(isAr, 'رسالة فيديو', 'Video Message');
+      case MessageType.voiceCall: return LanguageHelper.pick(isAr, 'سجل مكالمة صوتية', 'Voice Call Record');
+      case MessageType.videoCall: return LanguageHelper.pick(isAr, 'سجل مكالمة فيديو', 'Video Call Record');
+      case MessageType.dateDivider: return LanguageHelper.pick(isAr, 'فاصل تاريخ', 'Date Separator');
     }
   }
 
   String _oneTimeChipLabel(MessageType t, bool isAr) {
     switch (t) {
-      case MessageType.image: return isAr ? 'صورة' : 'Photo';
-      case MessageType.video: return isAr ? 'مقطع فيديو' : 'Video';
-      case MessageType.audio: return isAr ? 'صوتية' : 'Voice';
-      default: return isAr ? 'وسائط' : 'Media';
+      case MessageType.image: return LanguageHelper.pick(isAr, 'صورة', 'Photo');
+      case MessageType.video: return LanguageHelper.pick(isAr, 'مقطع فيديو', 'Video');
+      case MessageType.audio: return LanguageHelper.pick(isAr, 'صوتية', 'Voice');
+      default: return LanguageHelper.pick(isAr, 'وسائط', 'Media');
     }
   }
 
@@ -530,7 +530,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                           Text(
                             _audioBytes != null
                                 ? (isAr ? 'تم تسجيل رسالة صوتية (${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')})' : 'Voice Note Recorded (${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')})')
-                                : (isAr ? 'اضغط لتسجيل رسالة صوتية' : 'Tap to Record Voice Note'),
+                                : (LanguageHelper.pick(isAr, 'اضغط لتسجيل رسالة صوتية', 'Tap to Record Voice Note')),
                             style: TextStyle(
                               color: _audioBytes != null ? Colors.white : Colors.white38,
                               fontSize: 13,
@@ -621,7 +621,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 TextField(
                   controller: _fileNameController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(hintText: isAr ? 'مثال: AUD-20260614-WA0001.mp3' : 'e.g. AUD-20260614-WA0001.mp3'),
+                  decoration: InputDecoration(hintText: LanguageHelper.pick(isAr, 'مثال: AUD-20260614-WA0001.mp3', 'e.g. AUD-20260614-WA0001.mp3')),
                 ),
                 const SizedBox(height: 16),
                 _SLabel(LanguageHelper.translate('file_size', isAr)),
@@ -629,7 +629,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 TextField(
                   controller: _fileSizeController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(hintText: isAr ? 'مثال: 1.2 ميجابايت' : 'e.g. 1.2 MB'),
+                  decoration: InputDecoration(hintText: LanguageHelper.pick(isAr, 'مثال: 1.2 ميجابايت', 'e.g. 1.2 MB')),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -671,7 +671,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 TextField(
                   controller: _fileNameController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(hintText: isAr ? 'مثال: VID-20260614-WA0001.mp4' : 'e.g. VID-20260614-WA0001.mp4'),
+                  decoration: InputDecoration(hintText: LanguageHelper.pick(isAr, 'مثال: VID-20260614-WA0001.mp4', 'e.g. VID-20260614-WA0001.mp4')),
                 ),
                 const SizedBox(height: 16),
                 _SLabel(LanguageHelper.translate('file_size', isAr)),
@@ -679,7 +679,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 TextField(
                   controller: _fileSizeController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(hintText: isAr ? 'مثال: 4.2 ميجابايت' : 'e.g. 4.2 MB'),
+                  decoration: InputDecoration(hintText: LanguageHelper.pick(isAr, 'مثال: 4.2 ميجابايت', 'e.g. 4.2 MB')),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -874,7 +874,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             if (_type != MessageType.voiceCall && _type != MessageType.videoCall) ...[
               // Video picker (only for video type)
               if (_type == MessageType.video) ...[
-                _SLabel(isAr ? 'إطار غلاف الفيديو / الصورة المصغرة' : 'Video Cover Frame / Thumbnail'),
+                _SLabel(LanguageHelper.pick(isAr, 'إطار غلاف الفيديو / الصورة المصغرة', 'Video Cover Frame / Thumbnail')),
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: _pickImage,
@@ -951,7 +951,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _SLabel(isAr ? 'ملف الفيديو (اختياري)' : 'Video File (Optional)'),
+                _SLabel(LanguageHelper.pick(isAr, 'ملف الفيديو (اختياري)', 'Video File (Optional)')),
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: _pickVideo,
@@ -977,10 +977,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                           const SizedBox(width: 8),
                           Text(
                             _videoBytes != null
-                                ? (isAr
-                                    ? 'تغيير ملف الفيديو (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} ميجابايت)'
-                                    : 'Change Video File (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)')
-                                : (isAr ? 'اختر ملف الفيديو' : 'Pick Video File'),
+                                ? (LanguageHelper.pick(isAr, 'تغيير ملف الفيديو (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} ميجابايت)', 'Change Video File (${(_videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)'))
+                                : (LanguageHelper.pick(isAr, 'اختر ملف الفيديو', 'Pick Video File')),
                             style: TextStyle(
                               color: _videoBytes != null ? const Color(0xFF6C63FF) : Colors.white38,
                               fontSize: 13,
@@ -1076,7 +1074,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
               // Sticker picker options (for sticker type)
               if (_type == MessageType.sticker) ...[
-                _SLabel(isAr ? 'صورة الملصق' : 'Sticker Image'),
+                _SLabel(LanguageHelper.pick(isAr, 'صورة الملصق', 'Sticker Image')),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -1093,7 +1091,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                         ),
                         icon: const Icon(Icons.image_outlined, size: 18),
                         label: Text(
-                          isAr ? 'صورة مباشرة' : 'Direct Image',
+                          LanguageHelper.pick(isAr, 'صورة مباشرة', 'Direct Image'),
                           style: const TextStyle(fontSize: 12.5),
                         ),
                         onPressed: _pickStickerDirect,
@@ -1110,7 +1108,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                         ),
                         icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
                         label: Text(
-                          isAr ? 'إزالة الخلفية' : 'Remove BG',
+                          LanguageHelper.pick(isAr, 'إزالة الخلفية', 'Remove BG'),
                           style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                         ),
                         onPressed: _pickStickerAndRemoveBackground,
@@ -1134,14 +1132,14 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 ],
                 const SizedBox(height: 16),
               ],
-              _SLabel(_type == MessageType.dateDivider ? (isAr ? 'ملصق فاصل التاريخ' : 'Date Separator Label') : (_type == MessageType.image ? (isAr ? 'شرح الصورة (اختياري)' : 'Caption (Optional)') : (isAr ? 'نص الرسالة' : 'Message Text'))),
+              _SLabel(_type == MessageType.dateDivider ? (LanguageHelper.pick(isAr, 'ملصق فاصل التاريخ', 'Date Separator Label')) : (_type == MessageType.image ? (LanguageHelper.pick(isAr, 'شرح الصورة (اختياري)', 'Caption (Optional)')) : (LanguageHelper.pick(isAr, 'نص الرسالة', 'Message Text')))),
               const SizedBox(height: 6),
               TextField(
                 controller: _textController,
                 style: const TextStyle(color: Colors.white),
                 maxLines: _type == MessageType.dateDivider ? 1 : 3,
                 decoration: InputDecoration(
-                  hintText: _type == MessageType.dateDivider ? (isAr ? 'مثال: الأحد، 25 مايو، أو اليوم' : 'e.g., Sunday, May 25, or TODAY') : (isAr ? 'اكتب رسالتك المحاكاة...' : 'Type your text here...'),
+                  hintText: _type == MessageType.dateDivider ? (LanguageHelper.pick(isAr, 'مثال: الأحد، 25 مايو، أو اليوم', 'e.g., Sunday, May 25, or TODAY')) : (LanguageHelper.pick(isAr, 'اكتب رسالتك المحاكاة...', 'Type your text here...')),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1149,7 +1147,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Date Preset capsules (Only for dateDivider)
             if (_type == MessageType.dateDivider) ...[
-              _SLabel(isAr ? 'قوالب التاريخ الجاهزة' : 'Date Presets'),
+              _SLabel(LanguageHelper.pick(isAr, 'قوالب التاريخ الجاهزة', 'Date Presets')),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -1177,18 +1175,18 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Call Status Selector capsules (Only for voice/video calls)
             if (_type == MessageType.voiceCall || _type == MessageType.videoCall) ...[
-              _SLabel(isAr ? 'تفاصيل حالة المكالمة' : 'Call Status Details'),
+              _SLabel(LanguageHelper.pick(isAr, 'تفاصيل حالة المكالمة', 'Call Status Details')),
               const SizedBox(height: 8),
               Row(
                 children: ['Answered', 'Missed', 'Declined', 'No Answer'].map((status) {
                   final isSelected = _callStatus == status;
                   final statusLabelText = status == 'Answered'
-                      ? (isAr ? 'تم الرد عليها' : 'Answered')
+                      ? (LanguageHelper.pick(isAr, 'تم الرد عليها', 'Answered'))
                       : status == 'Missed'
-                          ? (isAr ? 'فائتة' : 'Missed')
+                          ? (LanguageHelper.pick(isAr, 'فائتة', 'Missed'))
                           : status == 'Declined'
-                              ? (isAr ? 'مرفوضة' : 'Declined')
-                              : (isAr ? 'لم يرد عليها' : 'No Answer');
+                              ? (LanguageHelper.pick(isAr, 'مرفوضة', 'Declined'))
+                              : (LanguageHelper.pick(isAr, 'لم يرد عليها', 'No Answer'));
                   return Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() => _callStatus = status),
@@ -1226,13 +1224,13 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             if (_type == MessageType.audio || 
                 _type == MessageType.video ||
                 ((_type == MessageType.voiceCall || _type == MessageType.videoCall) && _callStatus == 'Answered')) ...[
-              _SLabel(isAr ? 'مدة المكالمة / الصوت' : 'Call / Audio Duration'),
+              _SLabel(LanguageHelper.pick(isAr, 'مدة المكالمة / الصوت', 'Call / Audio Duration')),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _NumberPickerSimple(
-                    label: isAr ? 'دقيقة' : 'Min',
+                    label: LanguageHelper.pick(isAr, 'دقيقة', 'Min'),
                     value: _minutes,
                     min: 0,
                     max: 59,
@@ -1243,7 +1241,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     child: Text(':', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                   ),
                   _NumberPickerSimple(
-                    label: isAr ? 'ثانية' : 'Sec',
+                    label: LanguageHelper.pick(isAr, 'ثانية', 'Sec'),
                     value: _seconds,
                     min: 0,
                     max: 59,
@@ -1256,7 +1254,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Emoji Reaction Selector (Hidden for dateDividers)
             if (_type != MessageType.dateDivider) ...[
-              _SLabel(isAr ? 'تفاعل الرسالة (إيموجي)' : 'Message Reaction (Emoji)'),
+              _SLabel(LanguageHelper.pick(isAr, 'تفاعل الرسالة (إيموجي)', 'Message Reaction (Emoji)')),
               const SizedBox(height: 8),
               Row(
                 children: ['❤️', '👍', '😂', '😮', '😢', '🙏'].map((emoji) {
@@ -1296,7 +1294,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 maxLength: 4,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: isAr ? 'أو اكتب تفاعل إيموجي مخصص...' : 'Or type custom reaction emoji...',
+                  hintText: LanguageHelper.pick(isAr, 'أو اكتب تفاعل إيموجي مخصص...', 'Or type custom reaction emoji...'),
                   counterText: '',
                 ),
                 onChanged: (v) {
@@ -1310,13 +1308,13 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Sender / Receiver Toggle (Hidden for dateDividers)
             if (_type != MessageType.dateDivider) ...[
-              _SLabel(_type == MessageType.voiceCall || _type == MessageType.videoCall ? (isAr ? 'اتجاه المكالمة' : 'Call Direction') : (isAr ? 'الطرف المرسل' : 'Side')),
+              _SLabel(_type == MessageType.voiceCall || _type == MessageType.videoCall ? (LanguageHelper.pick(isAr, 'اتجاه المكالمة', 'Call Direction')) : (LanguageHelper.pick(isAr, 'الطرف المرسل', 'Side'))),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: _SideButton(
-                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? (isAr ? 'صادرة (يمين)' : 'Outgoing (Right)') : (isAr ? 'أنا (اليمين)' : 'Me (Right)'),
+                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? (LanguageHelper.pick(isAr, 'صادرة (يمين)', 'Outgoing (Right)')) : (LanguageHelper.pick(isAr, 'أنا (اليمين)', 'Me (Right)')),
                       icon: Icons.send_rounded,
                       isActive: _isSender,
                       color: accentColor,
@@ -1326,7 +1324,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _SideButton(
-                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? (isAr ? 'واردة (يسار)' : 'Incoming (Left)') : (isAr ? 'الطرف الآخر (اليسار)' : 'Them (Left)'),
+                      label: (_type == MessageType.voiceCall || _type == MessageType.videoCall) ? (LanguageHelper.pick(isAr, 'واردة (يسار)', 'Incoming (Left)')) : (LanguageHelper.pick(isAr, 'الطرف الآخر (اليسار)', 'Them (Left)')),
                       icon: Icons.person_rounded,
                       isActive: !_isSender,
                       color: const Color(0xFF42A5F5),
@@ -1367,7 +1365,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        isAr ? 'رسالة محذوفة (ألغيت)' : 'Deleted Message (Unsent)',
+                        LanguageHelper.pick(isAr, 'رسالة محذوفة (ألغيت)', 'Deleted Message (Unsent)'),
                         style: const TextStyle(color: Colors.white, fontSize: 13.5),
                       ),
                     ),
@@ -1404,7 +1402,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                isAr ? 'عرض لمرة واحدة (View Once)' : 'View Once (One Time)',
+                                LanguageHelper.pick(isAr, 'عرض لمرة واحدة (View Once)', 'View Once (One Time)'),
                                 style: TextStyle(color: oneTimeSupported ? Colors.white : Colors.white38, fontSize: 13.5),
                               ),
                             ),
@@ -1438,12 +1436,12 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                                 Row(
                                   children: [
                                     Text(
-                                      isAr ? 'حالة القراءة:' : 'Viewed State:',
+                                      LanguageHelper.pick(isAr, 'حالة القراءة:', 'Viewed State:'),
                                       style: const TextStyle(color: Colors.white70, fontSize: 12.5),
                                     ),
                                     const Spacer(),
                                     ChoiceChip(
-                                      label: Text(isAr ? 'لم تُفتح' : 'Unopened'),
+                                      label: Text(LanguageHelper.pick(isAr, 'لم تُفتح', 'Unopened')),
                                       selected: !_isOneTimeOpened,
                                       selectedColor: const Color(0xFF25D366),
                                       backgroundColor: Colors.white10,
@@ -1452,7 +1450,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                                     ),
                                     const SizedBox(width: 8),
                                     ChoiceChip(
-                                      label: Text(isAr ? 'تم فتحها' : 'Opened'),
+                                      label: Text(LanguageHelper.pick(isAr, 'تم فتحها', 'Opened')),
                                       selected: _isOneTimeOpened,
                                       selectedColor: Colors.grey,
                                       backgroundColor: Colors.white10,
@@ -1464,7 +1462,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                                 if (!_isOneTimeOpened && eligibleTypes.length > 1) ...[
                                   const SizedBox(height: 8),
                                   Text(
-                                    isAr ? 'نوع الوسائط:' : 'Media Category:',
+                                    LanguageHelper.pick(isAr, 'نوع الوسائط:', 'Media Category:'),
                                     style: const TextStyle(color: Colors.white70, fontSize: 12.5),
                                   ),
                                   const SizedBox(height: 6),
@@ -1505,7 +1503,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
             // Message Status (only for sender & text/image/audio)
             if (_isSender && _type != MessageType.dateDivider && _type != MessageType.voiceCall && _type != MessageType.videoCall) ...[
-              _SLabel(isAr ? 'حالة الرسالة' : 'Message Status'),
+              _SLabel(LanguageHelper.pick(isAr, 'حالة الرسالة', 'Message Status')),
               const SizedBox(height: 8),
               Row(
                 children: MessageStatus.values.map((s) {
@@ -1547,7 +1545,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             ],
 
             // Timestamp (Editable for all messages!)
-            _SLabel(isAr ? 'طابع الوقت (تغيير الوقت)' : 'Timestamp (Change Time)'),
+            _SLabel(LanguageHelper.pick(isAr, 'طابع الوقت (تغيير الوقت)', 'Timestamp (Change Time)')),
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () async {
@@ -1578,9 +1576,9 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
             Wrap(
               spacing: 8,
               children: [
-                _TimePreset(label: isAr ? 'الآن' : 'Just now', offset: Duration.zero, onSelect: (dt) => setState(() => _timestamp = dt)),
-                _TimePreset(label: isAr ? 'منذ 5 دقائق' : '5 min ago', offset: const Duration(minutes: 5), onSelect: (dt) => setState(() => _timestamp = dt)),
-                _TimePreset(label: isAr ? 'منذ ساعة' : '1 hr ago', offset: const Duration(hours: 1), onSelect: (dt) => setState(() => _timestamp = dt)),
+                _TimePreset(label: LanguageHelper.pick(isAr, 'الآن', 'Just now'), offset: Duration.zero, onSelect: (dt) => setState(() => _timestamp = dt)),
+                _TimePreset(label: LanguageHelper.pick(isAr, 'منذ 5 دقائق', '5 min ago'), offset: const Duration(minutes: 5), onSelect: (dt) => setState(() => _timestamp = dt)),
+                _TimePreset(label: LanguageHelper.pick(isAr, 'منذ ساعة', '1 hr ago'), offset: const Duration(hours: 1), onSelect: (dt) => setState(() => _timestamp = dt)),
                 _TimePreset(label: LanguageHelper.translate('yesterday', isAr), offset: const Duration(days: 1), onSelect: (dt) => setState(() => _timestamp = dt)),
               ],
             ),
@@ -1598,8 +1596,8 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                 onPressed: _save,
                 child: Text(
                   widget.editingMessage != null
-                      ? (isAr ? 'تعديل المكون' : 'Update Component')
-                      : (isAr ? 'إضافة المكون' : 'Add Component'),
+                      ? (LanguageHelper.pick(isAr, 'تعديل المكون', 'Update Component'))
+                      : (LanguageHelper.pick(isAr, 'إضافة المكون', 'Add Component')),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -1621,10 +1619,10 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
 
   String _statusLabel(MessageStatus s, bool isAr) {
     switch (s) {
-      case MessageStatus.sending: return isAr ? 'جاري الإرسال' : 'Sending';
-      case MessageStatus.sent: return isAr ? 'تم الإرسال' : 'Sent';
-      case MessageStatus.delivered: return isAr ? 'تم التسليم' : 'Delivered';
-      case MessageStatus.read: return isAr ? 'مقروءة' : 'Read';
+      case MessageStatus.sending: return LanguageHelper.pick(isAr, 'جاري الإرسال', 'Sending');
+      case MessageStatus.sent: return LanguageHelper.pick(isAr, 'تم الإرسال', 'Sent');
+      case MessageStatus.delivered: return LanguageHelper.pick(isAr, 'تم التسليم', 'Delivered');
+      case MessageStatus.read: return LanguageHelper.pick(isAr, 'مقروءة', 'Read');
     }
   }
 
@@ -1672,7 +1670,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
               ? Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Text(
-                    isAr ? 'لا توجد رسائل أخرى في هذه الدردشة للرد عليها.' : 'No other messages in this chat to reply to.',
+                    LanguageHelper.pick(isAr, 'لا توجد رسائل أخرى في هذه الدردشة للرد عليها.', 'No other messages in this chat to reply to.'),
                     style: const TextStyle(color: Colors.white38),
                     textAlign: TextAlign.center,
                   ),
@@ -1688,7 +1686,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                     final dialogAccentColor = platformTheme?.sendButtonColor ?? const Color(0xFF6C63FF);
 
                     final senderName = m.isSender
-                        ? (isAr ? 'أنت' : 'You')
+                        ? (LanguageHelper.pick(isAr, 'أنت', 'You'))
                         : (session != null && session.contactUser.name.isNotEmpty ? session.contactUser.name : LanguageHelper.translate('contact', isAr));
 
                     return ListTile(

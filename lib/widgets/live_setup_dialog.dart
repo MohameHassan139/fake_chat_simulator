@@ -154,7 +154,7 @@ class _LiveSetupDialogState extends State<LiveSetupDialog> {
                 style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
-                isAr ? 'تم إيقاف الصوت تلقائياً' : 'All sound muted',
+                LanguageHelper.pick(isAr, 'تم إيقاف الصوت تلقائياً', 'All sound muted'),
                 style: TextStyle(color: textColor.withValues(alpha: 0.5), fontSize: 11),
               ),
               value: _soundEnabled,
@@ -178,9 +178,7 @@ class _LiveSetupDialogState extends State<LiveSetupDialog> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      isAr
-                          ? 'عرض كامل ونظيف بدون أي أزرار فوق الشاشة لالتقاط تسجيل فيديو احترافي.'
-                          : '100% clean full-screen view without overlay buttons for professional video recording.',
+                      LanguageHelper.pick(isAr, 'عرض كامل ونظيف بدون أي أزرار فوق الشاشة لالتقاط تسجيل فيديو احترافي.', '100% clean full-screen view without overlay buttons for professional video recording.'),
                       style: TextStyle(
                         color: textColor.withValues(alpha: 0.9),
                         fontSize: 11,

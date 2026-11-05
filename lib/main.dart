@@ -7,10 +7,13 @@ import 'providers/chat_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'services/ad_service.dart';
+import 'services/purchase_service.dart';
 import 'themes/app_theme.dart';
+import 'utils/media_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await MediaStore.init();
   await Hive.initFlutter();
   await Hive.openBox('sessions_box');
   await Hive.openBox('settings_box');
@@ -20,7 +23,8 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   runApp(const FakeChatSimulatorApp());
-  AdService.instance.init();             // consent + ads in the background, never blocks the start
+  // "Remove ads" first so a buyer never sees one; consent + ads in the background, never blocks the start
+  PurchaseService.instance.init().whenComplete(AdService.instance.init);
 }
 
 class FakeChatSimulatorApp extends StatelessWidget {

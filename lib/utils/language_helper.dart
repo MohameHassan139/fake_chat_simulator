@@ -1,4 +1,32 @@
+import 'language_extra.dart';
+
 class LanguageHelper {
+  /// The app's languages: code -> the name shown in the language menu.
+  static const Map<String, String> languages = {
+    'en': 'English',
+    'ar': 'العربية',
+    'es': 'Español',
+    'pt': 'Português',
+    'fr': 'Français',
+    'hi': 'हिन्दी',
+    'id': 'Bahasa Indonesia',
+    'tr': 'Türkçe',
+  };
+
+  /// The chosen language, set by ThemeProvider. The `isArabic` flags the
+  /// screens pass around still mean Arabic (and right-to-left).
+  static String code = 'en';
+
+  static String _lang(bool isArabic) => isArabic ? 'ar' : code;
+
+  /// An inline Arabic/English pair; the other languages look the English
+  /// text up in [extraByEnglish] and fall back to English.
+  static String pick(bool isArabic, String ar, String en) {
+    if (isArabic) return ar;
+    if (code == 'en') return en;
+    return extraByEnglish[code]?[en] ?? en;
+  }
+
   static const Map<String, Map<String, String>> _localizedValues = {
     'en': {
       'app_title_1': 'FakeChat',
@@ -207,6 +235,48 @@ class LanguageHelper {
       'auto_match_platform': 'Match App Sound',
       'start_live_now': 'Start Live Chat',
       'double_tap_exit_hint': 'Live Playback • Double tap anywhere to exit',
+      'fake_call': 'Fake Call',
+      'fc_now': 'Now',
+      'fc_seconds': 'sec',
+      'fc_minutes': 'min',
+      'fc_photo': 'Caller photo (optional)',
+      'fc_caller_name': 'Caller name',
+      'fc_caller_label': 'Under the name (e.g. Mobile)',
+      'fc_voice': 'Voice',
+      'fc_video': 'Video',
+      'fc_when': 'When should it ring?',
+      'fc_ringtone': 'Ringtone',
+      'fc_keep_open': 'Keep the app open until it rings (the screen goes dark while waiting).',
+      'fc_start': 'Start fake call',
+      'fc_incoming_voice': 'Incoming voice call',
+      'fc_incoming_video': 'Incoming video call',
+      'fc_decline': 'Decline',
+      'fc_accept': 'Accept',
+      'fc_mute': 'Mute',
+      'fc_speaker': 'Speaker',
+      'fc_flip': 'Flip',
+      'fc_keypad': 'Keypad',
+      'fc_end': 'End',
+      'fc_default_name': 'Mom',
+      'fc_default_label': 'Mobile',
+      'language': 'Language',
+      'remove_ads': 'Remove ads',
+      'remove_ads_done': 'Ads removed. Thank you!',
+      'restore_purchase': 'Restore purchase',
+      'privacy_settings': 'Privacy settings',
+      'store_unavailable': 'The store is not available right now. Try again later.',
+      'qt_me': 'Me',
+      'qt_them': 'Them',
+      'prank_of_day': 'PRANK OF THE DAY',
+      'use_it': 'Use it',
+      'daily_reminder': 'Daily prank reminder',
+      'send_feedback': 'Send feedback',
+      'tips_title': 'Make a fake chat in 1 minute',
+      'tip_1': 'Type a line at the bottom and tap +',
+      'tip_2': 'Tap Me / Them to switch who is talking',
+      'tip_3': 'Tap any message to edit or delete it',
+      'tip_4': 'Tap the camera to save the screenshot',
+      'tips_ok': 'Got it',
     },
     'ar': {
       'app_title_1': 'شات',
@@ -415,19 +485,64 @@ class LanguageHelper {
       'auto_match_platform': 'نغمة التطبيق الأصلي',
       'start_live_now': 'بدء العرض المباشر',
       'double_tap_exit_hint': 'عرض مباشر • اضغط مرتين في أي مكان للخروج',
+      'fake_call': 'مكالمة وهمية',
+      'fc_now': 'الآن',
+      'fc_seconds': 'ثانية',
+      'fc_minutes': 'دقيقة',
+      'fc_photo': 'صورة المتصل (اختياري)',
+      'fc_caller_name': 'اسم المتصل',
+      'fc_caller_label': 'تحت الاسم (مثل: موبايل)',
+      'fc_voice': 'صوت',
+      'fc_video': 'فيديو',
+      'fc_when': 'متى يرن الهاتف؟',
+      'fc_ringtone': 'نغمة الرنين',
+      'fc_keep_open': 'اترك التطبيق مفتوحاً حتى يرن (الشاشة تصبح سوداء أثناء الانتظار).',
+      'fc_start': 'ابدأ المكالمة الوهمية',
+      'fc_incoming_voice': 'مكالمة صوتية واردة',
+      'fc_incoming_video': 'مكالمة فيديو واردة',
+      'fc_decline': 'رفض',
+      'fc_accept': 'رد',
+      'fc_mute': 'كتم',
+      'fc_speaker': 'مكبر الصوت',
+      'fc_flip': 'تبديل',
+      'fc_keypad': 'لوحة الأرقام',
+      'fc_end': 'إنهاء',
+      'fc_default_name': 'ماما',
+      'fc_default_label': 'موبايل',
+      'language': 'اللغة',
+      'remove_ads': 'إزالة الإعلانات',
+      'remove_ads_done': 'تمت إزالة الإعلانات. شكراً لك!',
+      'restore_purchase': 'استعادة الشراء',
+      'privacy_settings': 'إعدادات الخصوصية',
+      'store_unavailable': 'المتجر غير متاح الآن. حاول لاحقاً.',
+      'qt_me': 'أنا',
+      'qt_them': 'هو',
+      'prank_of_day': 'مقلب اليوم',
+      'use_it': 'جرّبه',
+      'daily_reminder': 'تذكير مقلب اليوم',
+      'send_feedback': 'أرسل ملاحظة',
+      'tips_title': 'اعمل محادثة وهمية في دقيقة',
+      'tip_1': 'اكتب الرسالة تحت واضغط +',
+      'tip_2': 'اضغط أنا / هو لتغيير مين بيتكلم',
+      'tip_3': 'اضغط على أي رسالة لتعديلها أو حذفها',
+      'tip_4': 'اضغط الكاميرا لحفظ الصورة',
+      'tips_ok': 'فهمت',
     }
   };
 
   static String translate(String key, bool isArabic) {
-    final lang = isArabic ? 'ar' : 'en';
-    return _localizedValues[lang]?[key] ?? key;
+    final lang = _lang(isArabic);
+    final own = _localizedValues[lang]?[key];
+    if (own != null) return own;
+    final en = _localizedValues['en']?[key];
+    if (en == null) return key;
+    return extraByEnglish[lang]?[en] ?? en;
   }
 
   static String translateDate(String label, bool isArabic) {
     final lower = label.trim().toLowerCase();
-    final lang = isArabic ? 'ar' : 'en';
     if (_localizedValues['en']!.containsKey(lower) || _localizedValues['ar']!.containsKey(lower)) {
-      return _localizedValues[lang]?[lower] ?? label;
+      return translate(lower, isArabic);
     }
     return label;
   }

@@ -11,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../themes/platform_themes.dart';
 import '../utils/video_helper.dart';
 import 'message_bubble.dart' show ProgressRingPainter;
+import '../utils/language_helper.dart';
 
 /// Dialog helper for showing full screen media viewers matching real WhatsApp / Telegram:
 /// 1. Fullscreen Image (Pinch-to-zoom, top WhatsApp bar with star/share/download, bottom reply & reactions)
@@ -189,8 +190,8 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
   Widget build(BuildContext context) {
     final isArabic = Provider.of<ThemeProvider>(context).isArabic;
     final bool hasCaption = widget.caption != null && widget.caption!.trim().isNotEmpty;
-    final displayName = widget.senderName ?? (widget.isSender ? (isArabic ? 'أنت' : 'You') : 'Khaled Nageh');
-    final timeSubtitle = widget.formattedTime ?? (isArabic ? 'اليوم، ٥:٢٣ ص' : 'Today at 5:23 AM');
+    final displayName = widget.senderName ?? (widget.isSender ? (LanguageHelper.pick(isArabic, 'أنت', 'You')) : 'Khaled Nageh');
+    final timeSubtitle = widget.formattedTime ?? (LanguageHelper.pick(isArabic, 'اليوم، ٥:٢٣ ص', 'Today at 5:23 AM'));
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -370,7 +371,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                                 borderRadius: BorderRadius.circular(24),
                               ),
                               child: Text(
-                                isArabic ? 'رد' : 'Reply',
+                                LanguageHelper.pick(isArabic, 'رد', 'Reply'),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
@@ -603,10 +604,10 @@ class _FullscreenVideoViewerState extends State<FullscreenVideoViewer> {
   Widget build(BuildContext context) {
     final isArabic = Provider.of<ThemeProvider>(context).isArabic;
     final bool hasCaption = widget.message.text.isNotEmpty;
-    final displayName = widget.senderName ?? (widget.message.isSender ? (isArabic ? 'أنت' : 'You') : 'Khaled Nageh');
+    final displayName = widget.senderName ?? (widget.message.isSender ? (LanguageHelper.pick(isArabic, 'أنت', 'You')) : 'Khaled Nageh');
     final timeSubtitle = widget.message.formattedTime.isNotEmpty 
-        ? (isArabic ? 'اليوم، ${widget.message.formattedTime}' : 'Today at ${widget.message.formattedTime}')
-        : (isArabic ? 'اليوم، ٥:٢٣ ص' : 'Today at 5:23 AM');
+        ? (LanguageHelper.pick(isArabic, 'اليوم، ${widget.message.formattedTime}', 'Today at ${widget.message.formattedTime}'))
+        : (LanguageHelper.pick(isArabic, 'اليوم، ٥:٢٣ ص', 'Today at 5:23 AM'));
 
     const greenColor = Color(0xFF25D366);
 
@@ -867,7 +868,7 @@ class _FullscreenVideoViewerState extends State<FullscreenVideoViewer> {
                                       borderRadius: BorderRadius.circular(24),
                                     ),
                                     child: Text(
-                                      isArabic ? 'رد' : 'Reply',
+                                      LanguageHelper.pick(isArabic, 'رد', 'Reply'),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,

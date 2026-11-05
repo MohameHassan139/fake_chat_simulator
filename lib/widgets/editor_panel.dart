@@ -67,7 +67,7 @@ class EditorPanel extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        isAr ? 'معاينة قائمة الرسائل نشطة' : 'Inbox (Chat List) Mode Active',
+                        LanguageHelper.pick(isAr, 'معاينة قائمة الرسائل نشطة', 'Inbox (Chat List) Mode Active'),
                         style: TextStyle(
                           color: isDark ? Colors.white : Colors.black87,
                           fontSize: 15.5,
@@ -76,9 +76,7 @@ class EditorPanel extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isAr
-                            ? 'أنت تعاين حاليًا صندوق الوارد لتطبيق ${session.platformName}. اضغط على أي محادثة في محاكي الهاتف لفتحها وتعديل محتواها.'
-                            : 'You are previewing the inbox feed for ${session.platformName}. Tap any chat inside the phone frame above to open it and edit.',
+                        LanguageHelper.pick(isAr, 'أنت تعاين حاليًا صندوق الوارد لتطبيق ${session.platformName}. اضغط على أي محادثة في محاكي الهاتف لفتحها وتعديل محتواها.', 'You are previewing the inbox feed for ${session.platformName}. Tap any chat inside the phone frame above to open it and edit.'),
                         style: TextStyle(
                           color: isDark ? Colors.white54 : Colors.black54,
                           fontSize: 12,
@@ -107,7 +105,7 @@ class EditorPanel extends StatelessWidget {
                     ),
                     icon: Icon(Icons.chat_bubble_outline_rounded, color: isDark ? Colors.white70 : Colors.black54, size: 16),
                     label: Text(
-                      isAr ? 'العودة للمحادثة' : 'Back to Chat',
+                      LanguageHelper.pick(isAr, 'العودة للمحادثة', 'Back to Chat'),
                       style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
                     ),
                     onPressed: () {
@@ -127,7 +125,7 @@ class EditorPanel extends StatelessWidget {
                     ),
                     icon: const Icon(Icons.settings_outlined, color: Colors.white70, size: 16),
                     label: Text(
-                      isAr ? 'إعدادات الإطار' : 'Mockup Settings',
+                      LanguageHelper.pick(isAr, 'إعدادات الإطار', 'Mockup Settings'),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     onPressed: () {
@@ -170,7 +168,7 @@ class EditorPanel extends StatelessWidget {
                                     size: 16, color: Colors.white),
                                 const SizedBox(width: 6),
                                 Text(
-                                  isAr ? 'تصدير' : 'Export',
+                                  LanguageHelper.pick(isAr, 'تصدير', 'Export'),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -372,7 +370,7 @@ class _ActionRow extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.image_outlined, color: Color(0xFF25D366)),
-              title: Text(isAr ? 'إضافة صورة كملصق مباشرة' : 'Add Image as Sticker (Direct)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+              title: Text(LanguageHelper.pick(isAr, 'إضافة صورة كملصق مباشرة', 'Add Image as Sticker (Direct)'), style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _pickStickerDirect(context);
@@ -380,7 +378,7 @@ class _ActionRow extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.auto_fix_high_rounded, color: Color(0xFFFF6584)),
-              title: Text(isAr ? 'إضافة ملصق وإزالة الخلفية تلقائيًا' : 'Add Sticker with Background Removal', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+              title: Text(LanguageHelper.pick(isAr, 'إضافة ملصق وإزالة الخلفية تلقائيًا', 'Add Sticker with Background Removal'), style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _pickStickerAndRemoveBackground(context);
@@ -410,28 +408,29 @@ class _ActionRow extends StatelessWidget {
   }
 
   Future<void> _pickStickerAndRemoveBackground(BuildContext context) async {
-    if (!await PremiumPass.instance.ensure(context) || !context.mounted) return;
+    // Taken now: after a rewarded ad or the photo picker this button's
+    // context may be gone, the navigator and the chat are not.
+    final navigator = Navigator.of(context);
+    final chatProvider = context.read<ChatProvider>();
+    if (!await PremiumPass.instance.ensure(context) || !navigator.mounted) return;
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
-    if (file != null && context.mounted) {
-      final bytes = await file.readAsBytes();
-      if (!context.mounted) return;
-      final processedBytes = await showDialog<Uint8List>(
-        context: context,
-        builder: (_) => BackgroundRemoverDialog(originalBytes: bytes),
-      );
-      if (processedBytes != null && context.mounted) {
-        final chatProvider = context.read<ChatProvider>();
-        chatProvider.addMessage(ChatMessage(
-          id: const Uuid().v4(),
-          text: '',
-          type: MessageType.sticker,
-          isSender: chatProvider.isSenderMode,
-          timestamp: DateTime.now(),
-          imageBytes: processedBytes,
-        ));
-      }
-    }
+    if (file == null || !navigator.mounted) return;
+    final bytes = await file.readAsBytes();
+    if (!navigator.mounted) return;
+    final processedBytes = await showDialog<Uint8List>(
+      context: navigator.context,
+      builder: (_) => BackgroundRemoverDialog(originalBytes: bytes),
+    );
+    if (processedBytes == null) return;
+    chatProvider.addMessage(ChatMessage(
+      id: const Uuid().v4(),
+      text: '',
+      type: MessageType.sticker,
+      isSender: chatProvider.isSenderMode,
+      timestamp: DateTime.now(),
+      imageBytes: processedBytes,
+    ));
   }
 
   void _showAudioOptions(BuildContext context) {
@@ -447,7 +446,7 @@ class _ActionRow extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.mic, color: Color(0xFF6C63FF)),
-              title: Text(isAr ? 'تسجيل رسالة صوتية (Voice Note)' : 'Record Voice Note (Recorded)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+              title: Text(LanguageHelper.pick(isAr, 'تسجيل رسالة صوتية (Voice Note)', 'Record Voice Note (Recorded)'), style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _recordVoiceNote(context);
@@ -455,7 +454,7 @@ class _ActionRow extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.audiotrack, color: Color(0xFFF27B13)),
-              title: Text(isAr ? 'إضافة ملف صوتي (Audio File)' : 'Add Audio File (Picked)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+              title: Text(LanguageHelper.pick(isAr, 'إضافة ملف صوتي (Audio File)', 'Add Audio File (Picked)'), style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _pickAudioFile(context);
@@ -519,7 +518,7 @@ class _ActionRow extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.videocam, color: Color(0xFF6C63FF)),
-              title: Text(isAr ? 'تسجيل فيديو بالكاميرا' : 'Record Video Note (Camera)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+              title: Text(LanguageHelper.pick(isAr, 'تسجيل فيديو بالكاميرا', 'Record Video Note (Camera)'), style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _captureVideo(context, ImageSource.camera);
@@ -527,7 +526,7 @@ class _ActionRow extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.video_library, color: Color(0xFFE1306C)),
-              title: Text(isAr ? 'اختيار فيديو من الاستوديو' : 'Pick Video File (Gallery)', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+              title: Text(LanguageHelper.pick(isAr, 'اختيار فيديو من الاستوديو', 'Pick Video File (Gallery)'), style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               onTap: () {
                 Navigator.pop(sheetCtx);
                 _captureVideo(context, ImageSource.gallery);
@@ -630,9 +629,12 @@ class _QuickAddRow extends StatefulWidget {
 class _QuickAddRowState extends State<_QuickAddRow> {
   final _controller = TextEditingController();
 
+  final FocusNode _focus = FocusNode();
+
   @override
   void dispose() {
     _controller.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -647,6 +649,7 @@ class _QuickAddRowState extends State<_QuickAddRow> {
       timestamp: DateTime.now(),
     );
     _controller.clear();
+    _focus.requestFocus();                           // quick typing: the keyboard stays up for the next line
   }
 
   @override
@@ -660,10 +663,43 @@ class _QuickAddRowState extends State<_QuickAddRow> {
     final iconColor = isDark ? Colors.white54 : Colors.black54;
 
     final isAr = context.read<ThemeProvider>().isArabic;
+    final chatProvider = context.watch<ChatProvider>();
+    final me = chatProvider.isSenderMode;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: Row(
         children: [
+          // Who says the next line: one tap flips it, so a whole chat is typed in a minute
+          GestureDetector(
+            onTap: chatProvider.toggleSenderMode,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: me ? const Color(0xFF6C63FF) : iconBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: me ? const Color(0xFF6C63FF) : borderCol),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.swap_horiz_rounded, size: 16, color: me ? Colors.white : iconColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    LanguageHelper.translate(me ? 'qt_me' : 'qt_them', isAr),
+                    style: TextStyle(
+                      color: me ? Colors.white : textColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
               height: 42,
@@ -674,6 +710,8 @@ class _QuickAddRowState extends State<_QuickAddRow> {
               ),
               child: TextField(
                 controller: _controller,
+                focusNode: _focus,
+                textInputAction: TextInputAction.send,
                 style: TextStyle(color: textColor, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: LanguageHelper.translate('type_message_to_add', isAr),

@@ -8,7 +8,9 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 /// AdMob for Fake Chat: a small banner on the dashboard only (never on the chat
 /// screen, so screenshots stay clean) and an interstitial after a saved
 /// screenshot, at most every 2nd save and 2 minutes apart. A rewarded ad
-/// unlocks the premium features for a day (see premium_service.dart).
+/// unlocks the premium features for a day (see premium_service.dart). An App
+/// Open ad when the user comes back after a while (at most every 4 hours).
+/// Buying "Remove ads" (purchase_service.dart) turns all of them off.
 ///
 /// Real AdMob ids (app ca-app-pub-2509095132117735~9332794603). Debug builds
 /// always get Google's TEST ids: tapping real ads on our own phones counts as
@@ -19,16 +21,25 @@ class AdIds {
   static const String _testBanner = 'ca-app-pub-3940256099942544/6300978111';
   static const String _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
   static const String _testRewarded = 'ca-app-pub-3940256099942544/5224354917';
+  static const String _testAppOpen = 'ca-app-pub-3940256099942544/9257395921';
 
   static const String _banner = 'ca-app-pub-2509095132117735/2090114233';
   static const String _interstitial = 'ca-app-pub-2509095132117735/8220583328';
-  // The Rewarded unit from AdMob (Apps > Fake Chat > Ad units > Rewarded).
-  // While it is empty, release builds keep the premium features free.
-  static const String _rewarded = '';
+  static const String _rewarded = 'ca-app-pub-2509095132117735/1638330274';
+  // The App Open unit from AdMob (Apps > Fake Chat > Ad units > App open).
+  // While it is empty, release builds show no App Open ad.
+  static const String _appOpen = '';
 
   static String get banner => useTestAds ? _testBanner : _banner;
   static String get interstitial => useTestAds ? _testInterstitial : _interstitial;
   static String get rewarded => useTestAds ? _testRewarded : _rewarded;
+  static String get appOpen => useTestAds ? _testAppOpen : _appOpen;
+
+  /// Our own phones get Google's test ads even in a release build (AdMob ID
+  /// of each phone: the log line "setTestDeviceIds" when the app starts).
+  static const List<String> testDevices = [
+    '385CF9BD3DFEDED71F0E71AA602B1A5E',          // Michael's Redmi Note 9S
+  ];
 }
 
 class AdService {
@@ -41,8 +52,34 @@ class AdService {
   bool _ready = false;
   InterstitialAd? _interstitial;
   RewardedAd? _rewarded;
+  AppOpenAd? _appOpen;
+  DateTime? _appOpenLoadedAt;
+  DateTime? _appOpenShown;
+  DateTime? _backgroundSince;
+  bool _fullScreenShowing = false;
+  bool _adsRemoved = false;
+  AppLifecycleListener? _lifecycle;
   int _saves = 0;
   DateTime? _lastShown;
+
+  static const Duration appOpenGap = Duration(hours: 4);
+  static const Duration appOpenAway = Duration(seconds: 30);
+
+  /// "Remove ads" was bought: no banner, interstitial or App Open ad, and the
+  /// premium features are open for good.
+  bool get adsRemoved => _adsRemoved;
+  final ValueNotifier<bool> adsRemovedNotifier = ValueNotifier(false);
+
+  void setAdsRemoved(bool removed) {
+    _adsRemoved = removed;
+    adsRemovedNotifier.value = removed;
+    if (removed) {
+      _interstitial?.dispose();
+      _interstitial = null;
+      _appOpen?.dispose();
+      _appOpen = null;
+    }
+  }
 
   static bool get supported => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
@@ -53,11 +90,22 @@ class AdService {
     try {
       await _consent();
       final info = ConsentInformation.instance;
-      if (!await info.canRequestAds()) return;
+      // canRequestAds() is also false when the consent check itself failed
+      // (no privacy message set up in AdMob yet): that stopped every ad. Only
+      // "consent required and not given" (EEA/UK) keeps the ads off.
+      if (await info.getConsentStatus() == ConsentStatus.required && !await info.canRequestAds()) return;
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(testDeviceIds: AdIds.testDevices),
+      );
       await MobileAds.instance.initialize();
       _ready = true;
       _loadInterstitial();
       _loadRewarded();
+      _loadAppOpen();
+      _lifecycle ??= AppLifecycleListener(
+        onHide: () => _backgroundSince ??= DateTime.now(),
+        onShow: _onAppShown,
+      );
     } catch (e) {
       debugPrint('AdService.init failed: $e');
     }
@@ -83,8 +131,83 @@ class AdService {
 
   bool get ready => _ready;
 
+  /// The EEA/UK consent form must stay reachable from the app's settings.
+  Future<bool> privacyOptionsRequired() async {
+    if (!supported) return false;
+    try {
+      return await ConsentInformation.instance.getPrivacyOptionsRequirementStatus() ==
+          PrivacyOptionsRequirementStatus.required;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void showPrivacyOptions() {
+    ConsentForm.showPrivacyOptionsForm((FormError? error) {
+      if (error != null) debugPrint('Privacy options: ${error.message}');
+    });
+  }
+
+  void _loadAppOpen() {
+    if (!_ready || _adsRemoved || AdIds.appOpen.isEmpty) return;
+    AppOpenAd.load(
+      adUnitId: AdIds.appOpen,
+      request: const AdRequest(),
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) {
+          _appOpen = ad;
+          _appOpenLoadedAt = DateTime.now();
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('App open failed to load: $error');
+          _appOpen = null;
+        },
+      ),
+    );
+  }
+
+  /// Back in the app: an App Open ad only after a real break (not the photo
+  /// picker or the share sheet), never over another full-screen ad, at most
+  /// every [appOpenGap].
+  void _onAppShown() {
+    final since = _backgroundSince;
+    _backgroundSince = null;
+    if (_adsRemoved || _fullScreenShowing || since == null) return;
+    final now = DateTime.now();
+    if (now.difference(since) < appOpenAway) return;
+    if (_appOpenShown != null && now.difference(_appOpenShown!) < appOpenGap) return;
+    final ad = _appOpen;
+    if (ad == null) {
+      _loadAppOpen();
+      return;
+    }
+    if (now.difference(_appOpenLoadedAt ?? now) > const Duration(hours: 4)) {
+      ad.dispose();                                  // Google expires App Open ads after 4 hours
+      _appOpen = null;
+      _loadAppOpen();
+      return;
+    }
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        _fullScreenShowing = false;
+        ad.dispose();
+        _loadAppOpen();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        _fullScreenShowing = false;
+        ad.dispose();
+        _loadAppOpen();
+      },
+    );
+    _appOpen = null;
+    _appOpenShown = now;
+    _lastShown = now;
+    _fullScreenShowing = true;
+    ad.show();
+  }
+
   void _loadInterstitial() {
-    if (!_ready) return;
+    if (!_ready || _adsRemoved) return;
     InterstitialAd.load(
       adUnitId: AdIds.interstitial,
       request: const AdRequest(),
@@ -128,11 +251,13 @@ class AdService {
     var earned = false;
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
+        _fullScreenShowing = false;
         ad.dispose();
         _loadRewarded();
         if (!done.isCompleted) done.complete(earned);
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
+        _fullScreenShowing = false;
         ad.dispose();
         _loadRewarded();
         if (!done.isCompleted) done.complete(null);
@@ -140,6 +265,7 @@ class AdService {
     );
     _rewarded = null;
     _lastShown = DateTime.now();                     // no interstitial right after it
+    _fullScreenShowing = true;
     ad.show(onUserEarnedReward: (_, __) => earned = true);
     return done.future;
   }
@@ -151,19 +277,22 @@ class AdService {
     final ad = _interstitial;
     final now = DateTime.now();
     final tooSoon = _lastShown != null && now.difference(_lastShown!) < minGap;
-    if (ad == null || _saves % savesPerAd != 0 || tooSoon) return;
+    if (_adsRemoved || ad == null || _saves % savesPerAd != 0 || tooSoon) return;
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
+        _fullScreenShowing = false;
         ad.dispose();
         _loadInterstitial();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
+        _fullScreenShowing = false;
         ad.dispose();
         _loadInterstitial();
       },
     );
     _interstitial = null;
     _lastShown = now;
+    _fullScreenShowing = true;
     ad.show();
   }
 }
@@ -188,7 +317,7 @@ class _AdBannerState extends State<AdBanner> {
   }
 
   void _tryLoad() {
-    if (!AdService.supported) return;
+    if (!AdService.supported || AdService.instance.adsRemoved) return;
     if (!AdService.instance.ready) {                 // consent and the SDK start in the background
       _wait = Timer(const Duration(seconds: 2), _tryLoad);
       return;
@@ -218,15 +347,20 @@ class _AdBannerState extends State<AdBanner> {
 
   @override
   Widget build(BuildContext context) {
-    final ad = _ad;
-    if (!_loaded || ad == null) return const SizedBox.shrink();
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        width: ad.size.width.toDouble(),
-        height: ad.size.height.toDouble(),
-        child: AdWidget(ad: ad),
-      ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AdService.instance.adsRemovedNotifier,
+      builder: (context, removed, _) {
+        final ad = _ad;
+        if (removed || !_loaded || ad == null) return const SizedBox.shrink();
+        return SafeArea(
+          top: false,
+          child: SizedBox(
+            width: ad.size.width.toDouble(),
+            height: ad.size.height.toDouble(),
+            child: AdWidget(ad: ad),
+          ),
+        );
+      },
     );
   }
 }

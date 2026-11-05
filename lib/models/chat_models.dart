@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../utils/language_helper.dart';
+import '../utils/media_store.dart';
 
 enum Platform { whatsapp, messenger, instagram, snapchat }
 
@@ -90,7 +91,7 @@ class ChatUser {
     return {
       'id': id,
       'name': name,
-      'avatarBytes': avatarBytes,
+      'avatarBytes': MediaStore.ref(avatarBytes),
       'onlineStatus': onlineStatus.index,
       'lastSeen': lastSeen?.millisecondsSinceEpoch,
       'isTyping': isTyping,
@@ -113,19 +114,19 @@ class ChatUser {
   String statusText(bool isArabic) {
     switch (onlineStatus) {
       case UserOnlineStatus.online:
-        return isArabic ? 'متصل الآن' : 'online';
+        return LanguageHelper.pick(isArabic, 'متصل الآن', 'online');
       case UserOnlineStatus.typing:
-        return isArabic ? 'يكتب الآن...' : 'typing...';
+        return LanguageHelper.pick(isArabic, 'يكتب الآن...', 'typing...');
       case UserOnlineStatus.offline:
         if (lastSeen != null) {
-          return '${isArabic ? 'آخر ظهور' : 'last seen'} ${_formatLastSeen(lastSeen!, isArabic)}';
+          return '${LanguageHelper.pick(isArabic, 'آخر ظهور', 'last seen')} ${_formatLastSeen(lastSeen!, isArabic)}';
         }
-        return isArabic ? 'غير متصل' : 'offline';
+        return LanguageHelper.pick(isArabic, 'غير متصل', 'offline');
       case UserOnlineStatus.lastSeen:
         if (lastSeen != null) {
-          return '${isArabic ? 'آخر ظهور' : 'last seen'} ${_formatLastSeen(lastSeen!, isArabic)}';
+          return '${LanguageHelper.pick(isArabic, 'آخر ظهور', 'last seen')} ${_formatLastSeen(lastSeen!, isArabic)}';
         }
-        return isArabic ? 'آخر ظهور كان قريبًا' : 'last seen recently';
+        return LanguageHelper.pick(isArabic, 'آخر ظهور كان قريبًا', 'last seen recently');
     }
   }
 
@@ -133,7 +134,7 @@ class ChatUser {
     final now = DateTime.now();
     final diff = now.difference(dt);
     if (diff.inMinutes < 1) {
-      return isArabic ? 'الآن' : 'just now';
+      return LanguageHelper.pick(isArabic, 'الآن', 'just now');
     }
     if (diff.inMinutes < 60) {
       if (isArabic) {
@@ -145,10 +146,10 @@ class ChatUser {
       return '${diff.inMinutes} minutes ago';
     }
     if (diff.inHours < 24) {
-      return isArabic ? 'اليوم في ${_time(dt)}' : 'today at ${_time(dt)}';
+      return LanguageHelper.pick(isArabic, 'اليوم في ${_time(dt)}', 'today at ${_time(dt)}');
     }
     if (diff.inDays == 1) {
-      return isArabic ? 'أمس في ${_time(dt)}' : 'yesterday at ${_time(dt)}';
+      return LanguageHelper.pick(isArabic, 'أمس في ${_time(dt)}', 'yesterday at ${_time(dt)}');
     }
     return '${dt.day}/${dt.month}/${dt.year}';
   }
@@ -275,7 +276,7 @@ class ChatMessage {
       'timestamp': timestamp.millisecondsSinceEpoch,
       'status': status.index,
       'imagePath': imagePath,
-      'imageBytes': imageBytes,
+      'imageBytes': MediaStore.ref(imageBytes),
       'audioDuration': audioDuration?.inMilliseconds,
       'reaction': reaction,
       'repliedToId': repliedToId,
@@ -285,8 +286,8 @@ class ChatMessage {
       'isVideoMessage': isVideoMessage,
       'fileName': fileName,
       'fileSize': fileSize,
-      'videoBytes': videoBytes,
-      'audioBytes': audioBytes,
+      'videoBytes': MediaStore.ref(videoBytes),
+      'audioBytes': MediaStore.ref(audioBytes),
       'isForwarded': isForwarded,
       'isDeleted': isDeleted,
       'isOneTime': isOneTime,
@@ -501,7 +502,7 @@ class ChatSession {
       'fakeBattery': fakeBattery,
       'fakeWifi': fakeWifi,
       'fakeName': fakeName,
-      'fakeAvatarBytes': fakeAvatarBytes,
+      'fakeAvatarBytes': MediaStore.ref(fakeAvatarBytes),
       'isDarkMode': isDarkMode,
       'contactBio': contactBio,
       'contactSubBio': contactSubBio,
@@ -572,9 +573,4 @@ class ChatSession {
   }
 }
 
-Uint8List? _parseBytes(dynamic val) {
-  if (val == null) return null;
-  if (val is Uint8List) return val;
-  if (val is List) return Uint8List.fromList(List<int>.from(val));
-  return null;
-}
+Uint8List? _parseBytes(dynamic val) => MediaStore.load(val);

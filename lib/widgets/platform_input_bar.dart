@@ -4,6 +4,7 @@ import '../models/chat_models.dart';
 import '../themes/platform_themes.dart';
 import '../providers/theme_provider.dart';
 import '../providers/chat_provider.dart';
+import '../utils/language_helper.dart';
 
 class PlatformInputBar extends StatelessWidget {
   final Platform platform;
@@ -55,7 +56,7 @@ class _WhatsAppInput extends StatelessWidget {
     final iconColor = theme.chatBg == const Color(0xFF0B141A)
         ? const Color(0xFF8696A0)
         : const Color(0xFF667781);
-    final hintText = isArabic ? 'مراسلة' : 'Message';
+    final hintText = LanguageHelper.pick(isArabic, 'مراسلة', 'Message');
 
     // In RTL mode mic goes left, emoji goes right
     final micButton = Container(
@@ -317,7 +318,7 @@ class _InstagramInput extends StatelessWidget {
         theme.chatBg.toARGB32() == const Color(0xFF000000).toARGB32();
     final borderColor =
         isDark ? const Color(0xFF363636) : const Color(0xFFF2F2F2);
-    final hintText = isArabic ? 'رسالة...' : 'Message...';
+    final hintText = LanguageHelper.pick(isArabic, 'رسالة...', 'Message...');
     final iconColor = isDark ? Colors.white54 : Colors.black54;
     final fieldBorderColor =
         isDark ? const Color(0xFF363636) : const Color(0xFFE2E2E2);
@@ -447,7 +448,7 @@ class _SnapchatInput extends StatelessWidget {
         isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF2F2F2);
     final fieldBg = isDark ? const Color(0xFF1F2024) : const Color(0xFFF1F1F2);
     final textColor = isDark ? Colors.white54 : const Color(0xFF656667);
-    final hintText = isArabic ? 'أرسل رسالة' : 'Send a chat';
+    final hintText = LanguageHelper.pick(isArabic, 'أرسل رسالة', 'Send a chat');
     final iconBorderColor = isDark ? Colors.white54 : Colors.black87;
 
     final chatProvider = context.watch<ChatProvider>();
@@ -610,9 +611,7 @@ class _BlockedInputBar extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  isAr 
-                      ? 'لقد حظرت جهة الاتصال هذه. انقر لإلغاء الحظر.' 
-                      : 'You blocked this contact. Tap to unblock.',
+                  LanguageHelper.pick(isAr, 'لقد حظرت جهة الاتصال هذه. انقر لإلغاء الحظر.', 'You blocked this contact. Tap to unblock.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: textCol,
@@ -639,9 +638,7 @@ class _BlockedInputBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isAr 
-                    ? 'لقد حظرت ${session.contactUser.name}' 
-                    : 'You blocked ${session.contactUser.name}',
+                LanguageHelper.pick(isAr, 'لقد حظرت ${session.contactUser.name}', 'You blocked ${session.contactUser.name}'),
                 style: TextStyle(
                   color: isDark ? Colors.white : Colors.black,
                   fontSize: 14.5,
@@ -664,7 +661,7 @@ class _BlockedInputBar extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Text(
-                    isAr ? 'إلغاء الحظر' : 'Unblock',
+                    LanguageHelper.pick(isAr, 'إلغاء الحظر', 'Unblock'),
                     style: const TextStyle(
                       color: Color(0xFF0084FF),
                       fontSize: 15,
@@ -691,9 +688,7 @@ class _BlockedInputBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isAr 
-                    ? 'لقد حظرت ${session.contactUser.name}' 
-                    : 'You blocked ${session.contactUser.name}',
+                LanguageHelper.pick(isAr, 'لقد حظرت ${session.contactUser.name}', 'You blocked ${session.contactUser.name}'),
                 style: TextStyle(
                   color: isDark ? Colors.white : Colors.black,
                   fontSize: 14.5,
@@ -713,7 +708,7 @@ class _BlockedInputBar extends StatelessWidget {
               InkWell(
                 onTap: () => _showUnblockDialog(context, session),
                 child: Text(
-                  isAr ? 'إلغاء الحظر' : 'Unblock',
+                  LanguageHelper.pick(isAr, 'إلغاء الحظر', 'Unblock'),
                   style: const TextStyle(
                     color: Color(0xFF0095F6),
                     fontSize: 15,
@@ -738,9 +733,7 @@ class _BlockedInputBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isAr 
-                    ? 'لقد حظرت ${session.contactUser.name}' 
-                    : 'You blocked ${session.contactUser.name}',
+                LanguageHelper.pick(isAr, 'لقد حظرت ${session.contactUser.name}', 'You blocked ${session.contactUser.name}'),
                 style: TextStyle(
                   color: isDark ? Colors.white : Colors.black,
                   fontSize: 14.5,
@@ -758,7 +751,7 @@ class _BlockedInputBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    isAr ? 'إلغاء الحظر' : 'Unblock',
+                    LanguageHelper.pick(isAr, 'إلغاء الحظر', 'Unblock'),
                     style: const TextStyle(
                       color: Color(0xFF0084FF),
                       fontSize: 14,
@@ -794,14 +787,14 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
             backgroundColor: bg,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
             content: Text(
-              isAr ? 'هل تريد إلغاء حظر ${session.contactUser.name}؟' : 'Unblock ${session.contactUser.name}?',
+              LanguageHelper.pick(isAr, 'هل تريد إلغاء حظر ${session.contactUser.name}؟', 'Unblock ${session.contactUser.name}?'),
               style: TextStyle(color: textCol, fontSize: 16),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: Text(
-                  isAr ? 'إلغاء' : 'CANCEL',
+                  LanguageHelper.pick(isAr, 'إلغاء', 'CANCEL'),
                   style: TextStyle(color: actionCol, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -811,7 +804,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
                   Navigator.pop(ctx);
                 },
                 child: Text(
-                  isAr ? 'إلغاء الحظر' : 'UNBLOCK',
+                  LanguageHelper.pick(isAr, 'إلغاء الحظر', 'UNBLOCK'),
                   style: TextStyle(color: actionCol, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -829,14 +822,12 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Center(
               child: Text(
-                isAr ? 'إلغاء حظر ${session.contactUser.name}؟' : 'Unblock ${session.contactUser.name}?',
+                LanguageHelper.pick(isAr, 'إلغاء حظر ${session.contactUser.name}؟', 'Unblock ${session.contactUser.name}?'),
                 style: TextStyle(color: textCol, fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             content: Text(
-              isAr
-                  ? 'ستتمكنان من مراسلة والاتصال ببعضكما البعض مجددًا.'
-                  : 'You will be able to message and call each other again in this chat.',
+              LanguageHelper.pick(isAr, 'ستتمكنان من مراسلة والاتصال ببعضكما البعض مجددًا.', 'You will be able to message and call each other again in this chat.'),
               textAlign: TextAlign.center,
               style: TextStyle(color: subTextCol, fontSize: 14),
             ),
@@ -845,7 +836,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: Text(
-                  isAr ? 'إلغاء' : 'Cancel',
+                  LanguageHelper.pick(isAr, 'إلغاء', 'Cancel'),
                   style: const TextStyle(color: Color(0xFF0084FF), fontWeight: FontWeight.w600),
                 ),
               ),
@@ -855,7 +846,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
                   Navigator.pop(ctx);
                 },
                 child: Text(
-                  isAr ? 'إلغاء الحظر' : 'Unblock',
+                  LanguageHelper.pick(isAr, 'إلغاء الحظر', 'Unblock'),
                   style: const TextStyle(color: Color(0xFF0084FF), fontWeight: FontWeight.bold),
                 ),
               ),
@@ -879,15 +870,13 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
                   child: Column(
                     children: [
                       Text(
-                        isAr ? 'إلغاء حظر ${session.contactUser.name}؟' : 'Unblock ${session.contactUser.name}?',
+                        LanguageHelper.pick(isAr, 'إلغاء حظر ${session.contactUser.name}؟', 'Unblock ${session.contactUser.name}?'),
                         style: TextStyle(color: textCol, fontSize: 18, fontWeight: FontWeight.bold),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        isAr
-                            ? 'سيتمكنون الآن من رؤية منشوراتك ومتابعتك ومراسلتك.'
-                            : 'They will now be able to see your posts, follow you, and message you.',
+                        LanguageHelper.pick(isAr, 'سيتمكنون الآن من رؤية منشوراتك ومتابعتك ومراسلتك.', 'They will now be able to see your posts, follow you, and message you.'),
                         style: TextStyle(color: subTextCol, fontSize: 13),
                         textAlign: TextAlign.center,
                       ),
@@ -905,7 +894,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     alignment: Alignment.center,
                     child: Text(
-                      isAr ? 'إلغاء الحظر' : 'Unblock',
+                      LanguageHelper.pick(isAr, 'إلغاء الحظر', 'Unblock'),
                       style: const TextStyle(color: Color(0xFF0095F6), fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                   ),
@@ -918,7 +907,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     alignment: Alignment.center,
                     child: Text(
-                      isAr ? 'إلغاء' : 'Cancel',
+                      LanguageHelper.pick(isAr, 'إلغاء', 'Cancel'),
                       style: TextStyle(color: textCol, fontSize: 14),
                     ),
                   ),
@@ -933,14 +922,12 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Center(
               child: Text(
-                isAr ? 'إلغاء حظر ${session.contactUser.name}؟' : 'Unblock ${session.contactUser.name}?',
+                LanguageHelper.pick(isAr, 'إلغاء حظر ${session.contactUser.name}؟', 'Unblock ${session.contactUser.name}?'),
                 style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             content: Text(
-              isAr
-                  ? 'هل أنت متأكد أنك تريد إلغاء حظر مستخدم Snapchat هذا؟'
-                  : 'Are you sure you want to unblock this Snapchatter?',
+              LanguageHelper.pick(isAr, 'هل أنت متأكد أنك تريد إلغاء حظر مستخدم Snapchat هذا؟', 'Are you sure you want to unblock this Snapchatter?'),
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.black54, fontSize: 14),
             ),
@@ -949,7 +936,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: Text(
-                  isAr ? 'إلغاء' : 'Cancel',
+                  LanguageHelper.pick(isAr, 'إلغاء', 'Cancel'),
                   style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -959,7 +946,7 @@ void _showUnblockDialog(BuildContext context, ChatSession session) {
                   Navigator.pop(ctx);
                 },
                 child: Text(
-                  isAr ? 'نعم' : 'Yes',
+                  LanguageHelper.pick(isAr, 'نعم', 'Yes'),
                   style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -985,7 +972,7 @@ class _TheyBlockedMeInputBar extends StatelessWidget {
 
     String bannerText = '';
     if (session.platform == Platform.messenger) {
-      bannerText = isAr ? 'هذا الشخص غير متاح على Messenger.' : 'This person is unavailable on Messenger.';
+      bannerText = LanguageHelper.pick(isAr, 'هذا الشخص غير متاح على Messenger.', 'This person is unavailable on Messenger.');
     } else {
       bannerText = isAr ? 'لا يمكنك مراسلة هذا الحساب.' : 'You can\'t message this account.';
     }

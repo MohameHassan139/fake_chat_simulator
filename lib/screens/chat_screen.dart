@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
@@ -51,6 +52,48 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       curve: Curves.easeOutCubic,
     );
     _panelAnimController.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showTipsOnce());
+  }
+
+  /// The first chat ever: four short tips, then never again.
+  Future<void> _showTipsOnce() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('chat_tips_seen') ?? false) return;
+    await prefs.setBool('chat_tips_seen', true);
+    if (!mounted) return;
+    final isAr = context.read<ThemeProvider>().isArabic;
+    String t(String key) => LanguageHelper.translate(key, isAr);
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('tips_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final tip in const [
+              ('✏️', 'tip_1'),
+              ('🔁', 'tip_2'),
+              ('👆', 'tip_3'),
+              ('📸', 'tip_4'),
+            ])
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Text(tip.$1, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(t(tip.$2))),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          FilledButton(onPressed: () => Navigator.pop(ctx), child: Text(t('tips_ok'))),
+        ],
+      ),
+    );
   }
 
   @override
@@ -60,11 +103,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _startLiveSimulation(BuildContext context) async {
+  // The State's own context, not the button's: a rewarded ad rebuilds the
+  // screen, and the button's context is gone when the ad closes.
+  Future<void> _startLiveSimulation(BuildContext _) async {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final session = chatProvider.activeSession;
     if (session == null) return;
-    if (!await PremiumPass.instance.ensure(context) || !context.mounted) return;
+    if (!await PremiumPass.instance.ensure(context) || !mounted) return;
 
     showDialog(
       context: context,
@@ -162,7 +207,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 final success = savedPath != null;
                 final baseMsg = success
                     ? LanguageHelper.translate('screenshot_saved', isAr)
-                    : (isAr ? 'فشل حفظ لقطة الشاشة' : 'Failed to save screenshot');
+                    : (LanguageHelper.pick(isAr, 'فشل حفظ لقطة الشاشة', 'Failed to save screenshot'));
                 final finalMsg = (success && savedPath != 'Gallery')
                     ? '$baseMsg: $savedPath'
                     : baseMsg;
@@ -426,7 +471,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  isAr ? 'يجري تسجيل الشاشة كفيديو...' : 'RECORDING VIDEO...',
+                  LanguageHelper.pick(isAr, 'يجري تسجيل الشاشة كفيديو...', 'RECORDING VIDEO...'),
                   style: TextStyle(
                     color: isDark ? Colors.white : Colors.black87,
                     fontSize: 12,
@@ -435,7 +480,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                   ),
                 ),
                 Text(
-                  isAr ? 'يجري تسجيل الشاشة حاليًا' : 'Recording the simulator screen as video...',
+                  LanguageHelper.pick(isAr, 'يجري تسجيل الشاشة حاليًا', 'Recording the simulator screen as video...'),
                   style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 10),
                 ),
               ],
@@ -449,7 +494,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             icon: const Icon(Icons.stop_rounded, size: 16),
-            label: Text(isAr ? 'إيقاف' : 'Stop', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            label: Text(LanguageHelper.pick(isAr, 'إيقاف', 'Stop'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             onPressed: () {
               setState(() {
                 _isWebRecording = false;

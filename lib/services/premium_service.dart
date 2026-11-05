@@ -4,11 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/theme_provider.dart';
 import 'ad_service.dart';
+import '../utils/language_helper.dart';
 
 /// The premium features (Live video mode and the AI sticker background cut)
 /// open for [length] after one rewarded ad. When no ad can be shown (no
 /// network, no fill, consent refused, no Rewarded unit yet) the user goes
-/// through for free: an ad problem never blocks a feature.
+/// through for free: an ad problem never blocks a feature. "Remove ads"
+/// buyers have them for good.
 class PremiumPass {
   static final PremiumPass instance = PremiumPass._();
   PremiumPass._();
@@ -29,24 +31,23 @@ class PremiumPass {
 
   /// True when the user may use a premium feature now.
   Future<bool> ensure(BuildContext context) async {
-    if (!AdService.instance.rewardedEnabled || await active()) return true;
+    final ads = AdService.instance;
+    if (ads.adsRemoved || !ads.rewardedEnabled || await active()) return true;
     if (!context.mounted) return false;
     final isAr = context.read<ThemeProvider>().isArabic;
     final watch = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isAr ? 'ميزة مميزة ⭐' : 'Premium feature ⭐'),
-        content: Text(isAr
-            ? 'شاهد إعلاناً قصيراً لتفتح وضع الفيديو المباشر وقص خلفية الملصقات لمدة 24 ساعة.'
-            : 'Watch a short ad to unlock Live video mode and AI sticker cut-out for 24 hours.'),
+        title: Text(LanguageHelper.pick(isAr, 'ميزة مميزة ⭐', 'Premium feature ⭐')),
+        content: Text(LanguageHelper.pick(isAr, 'شاهد إعلاناً قصيراً لتفتح وضع الفيديو المباشر وقص خلفية الملصقات لمدة 24 ساعة.', 'Watch a short ad to unlock Live video mode and AI sticker cut-out for 24 hours.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(isAr ? 'ليس الآن' : 'Not now'),
+            child: Text(LanguageHelper.pick(isAr, 'ليس الآن', 'Not now')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isAr ? 'شاهد الإعلان' : 'Watch ad'),
+            child: Text(LanguageHelper.pick(isAr, 'شاهد الإعلان', 'Watch ad')),
           ),
         ],
       ),

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:uuid/uuid.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/chat_models.dart';
@@ -70,21 +72,59 @@ class ChatProvider extends ChangeNotifier {
       } else if (_sessions.isNotEmpty) {
         _activeSession = _sessions.first;
       }
+      _moveMediaOutOfHive();
     } catch (e) {
       debugPrint('Error initializing Hive in ChatProvider: $e');
     }
   }
 
+  // Edits come in bursts (typing, dragging a slider): the chat is written once
+  // they pause, and right away when the app goes to the background.
+  final Map<String, ChatSession> _pendingSaves = {};
+  Timer? _saveTimer;
+  AppLifecycleListener? _lifecycle;
+
   void _saveSession(ChatSession session) {
+    _pendingSaves[session.id] = session;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 400), _flushSaves);
+    _lifecycle ??= AppLifecycleListener(onHide: _flushSaves);
+  }
+
+  void _flushSaves() {
+    _saveTimer?.cancel();
+    final sessions = _pendingSaves.values.toList();
+    _pendingSaves.clear();
+    for (final session in sessions) {
+      try {
+        final sessionsBox = Hive.box('sessions_box');
+        sessionsBox.put(session.id, session.toMap());
+      } catch (e) {
+        debugPrint('Error saving session ${session.id}: $e');
+      }
+    }
+  }
+
+  /// Once per install: old versions kept the media inside Hive. Write every
+  /// chat again (the media moves to files) and shrink the database file.
+  Future<void> _moveMediaOutOfHive() async {
     try {
+      final settingsBox = Hive.box('settings_box');
+      if (settingsBox.get('media_in_files', defaultValue: false) as bool) return;
+      await Future.delayed(const Duration(seconds: 3));   // after the first screens are up
       final sessionsBox = Hive.box('sessions_box');
-      sessionsBox.put(session.id, session.toMap());
+      for (final session in List.of(_sessions)) {
+        await sessionsBox.put(session.id, session.toMap());
+      }
+      await sessionsBox.compact();
+      await settingsBox.put('media_in_files', true);
     } catch (e) {
-      debugPrint('Error saving session ${session.id}: $e');
+      debugPrint('Moving media out of Hive: $e');
     }
   }
 
   void _deleteSessionFromDb(String sessionId) {
+    _pendingSaves.remove(sessionId);
     try {
       final sessionsBox = Hive.box('sessions_box');
       sessionsBox.delete(sessionId);

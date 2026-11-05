@@ -188,7 +188,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
     final List<Map<String, dynamic>> mockChats = [
       {
         'name': 'Sarah ☕',
-        'message': isAr ? 'هل ما زلنا على موعد الغداء؟' : 'Are we still on for lunch?',
+        'message': LanguageHelper.pick(isAr, 'هل ما زلنا على موعد الغداء؟', 'Are we still on for lunch?'),
         'time': '10:42 AM',
         'unread': 2,
         'online': true,
@@ -199,8 +199,8 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
       },
       {
         'name': 'Family Group 🏡',
-        'message': isAr ? 'أبي: انظر إلى هذه الصورة!' : 'Dad: Check out this photo!',
-        'time': isAr ? 'أمس' : 'Yesterday',
+        'message': LanguageHelper.pick(isAr, 'أبي: انظر إلى هذه الصورة!', 'Dad: Check out this photo!'),
+        'time': LanguageHelper.pick(isAr, 'أمس', 'Yesterday'),
         'unread': 0,
         'online': false,
         'typing': false,
@@ -210,8 +210,8 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
       },
       {
         'name': 'Elon Musk 🚀',
-        'message': isAr ? 'المريخ يبدو رائعًا اليوم.' : 'Mars is looking great today.',
-        'time': isAr ? 'الأربعاء' : 'Wednesday',
+        'message': LanguageHelper.pick(isAr, 'المريخ يبدو رائعًا اليوم.', 'Mars is looking great today.'),
+        'time': LanguageHelper.pick(isAr, 'الأربعاء', 'Wednesday'),
         'unread': 0,
         'online': false,
         'typing': false,
@@ -221,7 +221,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
       },
       {
         'name': 'Dev Collaboration',
-        'message': isAr ? 'تمت مراجعة طلب السحب ودمجه بنجاح.' : 'PR reviewed and merged successfully.',
+        'message': LanguageHelper.pick(isAr, 'تمت مراجعة طلب السحب ودمجه بنجاح.', 'PR reviewed and merged successfully.'),
         'time': '24/05/2026',
         'unread': 0,
         'online': false,
@@ -267,7 +267,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
         final hasMessages = s.messages.isNotEmpty;
         final defaultLastMsgText = s.isGroup && s.groupMembers.isNotEmpty
             ? s.groupMembers
-            : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
+            : (LanguageHelper.pick(isAr, 'لا توجد رسائل بعد', 'No messages yet'));
         final lastMsgText = s.customLastMessage ??
             (hasMessages
                 ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)
@@ -293,7 +293,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
           name: s.contactUser.name,
           avatarBytes: s.contactUser.avatarBytes,
           message:
-              isTyping ? (isAr ? 'يكتب الآن...' : 'typing...') : lastMsgText,
+              isTyping ? (LanguageHelper.pick(isAr, 'يكتب الآن...', 'typing...')) : lastMsgText,
           time: lastMsgTime,
           unreadCount: s.unreadCount,
           isOnline: isOnline,
@@ -366,7 +366,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
             child: Row(
               children: [
                 Text(
-                  isAr ? 'واتساب' : 'WhatsApp',
+                  LanguageHelper.pick(isAr, 'واتساب', 'WhatsApp'),
                   style: TextStyle(
                     color: titleColor,
                     fontSize: 22,
@@ -421,9 +421,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        hintText: isAr
-                            ? 'اسأل Meta AI أو ابحث'
-                            : 'Ask Meta AI or search',
+                        hintText: LanguageHelper.pick(isAr, 'اسأل Meta AI أو ابحث', 'Ask Meta AI or search'),
                         hintStyle: TextStyle(
                           color: isDark
                               ? const Color(0xFF8696A0)
@@ -565,7 +563,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
             index: 0,
             icon: Icons.chat_outlined,
             activeIcon: Icons.chat_rounded,
-            label: isAr ? 'الدردشات' : 'Chats',
+            label: LanguageHelper.pick(isAr, 'الدردشات', 'Chats'),
             badgeText: '2',
             isSelected: _currentTabIndex == 0,
             isDark: isDark,
@@ -574,7 +572,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
             index: 1,
             icon: Icons.circle_notifications_outlined,
             activeIcon: Icons.circle_notifications_rounded,
-            label: isAr ? 'التحديثات' : 'Updates',
+            label: LanguageHelper.pick(isAr, 'التحديثات', 'Updates'),
             hasDotBadge: true,
             isSelected: _currentTabIndex == 1,
             isDark: isDark,
@@ -583,7 +581,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
             index: 2,
             icon: Icons.groups_outlined,
             activeIcon: Icons.groups_rounded,
-            label: isAr ? 'المجتمعات' : 'Communities',
+            label: LanguageHelper.pick(isAr, 'المجتمعات', 'Communities'),
             isSelected: _currentTabIndex == 2,
             isDark: isDark,
           ),
@@ -591,7 +589,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
             index: 3,
             icon: Icons.call_outlined,
             activeIcon: Icons.call,
-            label: isAr ? 'المكالمات' : 'Calls',
+            label: LanguageHelper.pick(isAr, 'المكالمات', 'Calls'),
             isSelected: _currentTabIndex == 3,
             isDark: isDark,
           ),
@@ -711,7 +709,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
       padding: const EdgeInsets.all(16.0),
       children: [
         Text(
-          isAr ? 'الحالة' : 'Status',
+          LanguageHelper.pick(isAr, 'الحالة', 'Status'),
           style: TextStyle(
               color: textCol, fontSize: 16, fontWeight: FontWeight.bold),
         ),
@@ -720,7 +718,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildStatusItem(isAr ? 'الحالة الخاصة بي' : 'My Status',
+              _buildStatusItem(LanguageHelper.pick(isAr, 'الحالة الخاصة بي', 'My Status'),
                   widget.session.fakeAvatarBytes, true, isDark),
               const SizedBox(width: 14),
               _buildStatusItem('Orange Egypt', null, false, isDark),
@@ -731,7 +729,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
         ),
         const SizedBox(height: 24),
         Text(
-          isAr ? 'القنوات المقترحة' : 'Suggested Channels',
+          LanguageHelper.pick(isAr, 'القنوات المقترحة', 'Suggested Channels'),
           style: TextStyle(
               color: textCol, fontSize: 16, fontWeight: FontWeight.bold),
         ),
@@ -816,7 +814,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
                         color: textCol,
                         fontWeight: FontWeight.bold,
                         fontSize: 14)),
-                Text(isAr ? 'قناة رسمية' : 'Official channel',
+                Text(LanguageHelper.pick(isAr, 'قناة رسمية', 'Official channel'),
                     style: TextStyle(color: secCol, fontSize: 12)),
               ],
             ),
@@ -831,7 +829,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
                   borderRadius: BorderRadius.circular(16)),
               padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
-            child: Text(isAr ? 'متابعة' : 'Follow',
+            child: Text(LanguageHelper.pick(isAr, 'متابعة', 'Follow'),
                 style:
                     const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ),
@@ -854,16 +852,14 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
           Icon(Icons.groups_rounded, size: 80, color: secCol),
           const SizedBox(height: 16),
           Text(
-            isAr ? 'تواصل مع المجتمعات' : 'Stay connected with communities',
+            LanguageHelper.pick(isAr, 'تواصل مع المجتمعات', 'Stay connected with communities'),
             style: TextStyle(
                 color: textCol, fontSize: 18, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            isAr
-                ? 'تجمع المجتمعات الأعضاء في مجموعات مشتركة الاهتمامات وتتيح تنظيم المجموعات وإرسال الإعلانات بسهولة.'
-                : 'Communities bring members together in topic-based groups, making it easy to organize and send announcements.',
+            LanguageHelper.pick(isAr, 'تجمع المجتمعات الأعضاء في مجموعات مشتركة الاهتمامات وتتيح تنظيم المجموعات وإرسال الإعلانات بسهولة.', 'Communities bring members together in topic-based groups, making it easy to organize and send announcements.'),
             style: TextStyle(color: secCol, fontSize: 13, height: 1.4),
             textAlign: TextAlign.center,
           ),
@@ -878,7 +874,7 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             child: Text(
-              isAr ? 'بدء مجتمع جديد' : 'Start your new community',
+              LanguageHelper.pick(isAr, 'بدء مجتمع جديد', 'Start your new community'),
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ),
@@ -905,16 +901,14 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isAr ? 'إنشاء رابط مكالمة' : 'Create call link',
+                  LanguageHelper.pick(isAr, 'إنشاء رابط مكالمة', 'Create call link'),
                   style: TextStyle(
                       color: textCol,
                       fontWeight: FontWeight.bold,
                       fontSize: 15),
                 ),
                 Text(
-                  isAr
-                      ? 'شارك رابطًا لمكالمة واتساب'
-                      : 'Share a link for your WhatsApp call',
+                  LanguageHelper.pick(isAr, 'شارك رابطًا لمكالمة واتساب', 'Share a link for your WhatsApp call'),
                   style: TextStyle(color: secCol, fontSize: 13),
                 ),
               ],
@@ -923,13 +917,13 @@ class _WhatsAppInboxState extends State<_WhatsAppInbox> {
         ),
         const SizedBox(height: 24),
         Text(
-          isAr ? 'المكالمات الأخيرة' : 'Recent calls',
+          LanguageHelper.pick(isAr, 'المكالمات الأخيرة', 'Recent calls'),
           style: TextStyle(
               color: textCol, fontSize: 15, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         _buildCallLogItem('معتز', true, false,
-            isAr ? 'أمس، 8:40 م' : 'Yesterday, 8:40 PM', isDark),
+            LanguageHelper.pick(isAr, 'أمس، 8:40 م', 'Yesterday, 8:40 PM'), isDark),
         _buildCallLogItem('Orange Egypt', false, true, '24/05/2026', isDark),
       ],
     );
@@ -1207,7 +1201,7 @@ class _MessengerInbox extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  isAr ? 'الدردشات' : 'Chats',
+                  LanguageHelper.pick(isAr, 'الدردشات', 'Chats'),
                   style: TextStyle(
                     color: textPrimary,
                     fontSize: 24,
@@ -1248,7 +1242,7 @@ class _MessengerInbox extends StatelessWidget {
                 Icon(Icons.search, color: textSecondary, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  isAr ? 'بحث' : 'Search',
+                  LanguageHelper.pick(isAr, 'بحث', 'Search'),
                   style: TextStyle(color: textSecondary, fontSize: 14),
                 ),
               ],
@@ -1300,7 +1294,7 @@ class _MessengerInbox extends StatelessWidget {
                   final defaultLastMsgText =
                       s.isGroup && s.groupMembers.isNotEmpty
                           ? s.groupMembers
-                          : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
+                          : (LanguageHelper.pick(isAr, 'لا توجد رسائل بعد', 'No messages yet'));
                   final lastMsgText = s.customLastMessage ??
                       (hasMessages
                           ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)
@@ -1325,7 +1319,7 @@ class _MessengerInbox extends StatelessWidget {
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
                     message: isTyping
-                        ? (isAr ? 'يكتب الآن...' : 'typing...')
+                        ? (LanguageHelper.pick(isAr, 'يكتب الآن...', 'typing...'))
                         : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
@@ -1623,7 +1617,7 @@ class _InstagramInbox extends StatelessWidget {
                 Icon(Icons.search, color: textSecondary, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  isAr ? 'بحث' : 'Search',
+                  LanguageHelper.pick(isAr, 'بحث', 'Search'),
                   style: TextStyle(color: textSecondary, fontSize: 14),
                 ),
               ],
@@ -1683,7 +1677,7 @@ class _InstagramInbox extends StatelessWidget {
                   final defaultLastMsgText =
                       s.isGroup && s.groupMembers.isNotEmpty
                           ? s.groupMembers
-                          : (isAr ? 'لا توجد رسائل بعد' : 'No messages yet');
+                          : (LanguageHelper.pick(isAr, 'لا توجد رسائل بعد', 'No messages yet'));
                   final lastMsgText = s.customLastMessage ??
                       (hasMessages
                           ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)
@@ -1708,7 +1702,7 @@ class _InstagramInbox extends StatelessWidget {
                     name: s.contactUser.name,
                     avatarBytes: s.contactUser.avatarBytes,
                     message: isTyping
-                        ? (isAr ? 'يكتب الآن...' : 'typing...')
+                        ? (LanguageHelper.pick(isAr, 'يكتب الآن...', 'typing...'))
                         : lastMsgText,
                     time: lastMsgTime,
                     isUnread: s.unreadCount > 0,
@@ -2023,7 +2017,7 @@ class _SnapchatInbox extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  isAr ? 'دردشة' : 'Chat',
+                  LanguageHelper.pick(isAr, 'دردشة', 'Chat'),
                   style: TextStyle(
                     color: textPrimary,
                     fontSize: 20,
@@ -2069,7 +2063,7 @@ class _SnapchatInbox extends StatelessWidget {
                   final defaultLastMsgText =
                       s.isGroup && s.groupMembers.isNotEmpty
                           ? s.groupMembers
-                          : (isAr ? 'دردشة جديدة' : 'New Chat');
+                          : (LanguageHelper.pick(isAr, 'دردشة جديدة', 'New Chat'));
                   final msg = s.customLastMessage ??
                       (hasMessages
                           ? s.messages.last.previewText(s.platform, s.contactUser.name, isAr)

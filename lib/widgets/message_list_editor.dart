@@ -222,7 +222,7 @@ class _MessageContextMenu extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    message.text.isEmpty ? (isAr ? '[مكون]' : '[${message.type.name}]') : message.text,
+                    message.text.isEmpty ? (LanguageHelper.pick(isAr, '[مكون]', '[${message.type.name}]')) : message.text,
                     style: TextStyle(color: textColor, fontSize: 14),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -237,7 +237,7 @@ class _MessageContextMenu extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    message.isSender ? (isAr ? 'أنا' : 'Me') : (isAr ? 'الطرف الآخر' : 'Them'),
+                    message.isSender ? (LanguageHelper.pick(isAr, 'أنا', 'Me')) : (LanguageHelper.pick(isAr, 'الطرف الآخر', 'Them')),
                     style: TextStyle(
                       fontSize: 11,
                       color: message.isSender ? const Color(0xFF6C63FF) : const Color(0xFF42A5F5),
