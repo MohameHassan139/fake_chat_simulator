@@ -277,6 +277,13 @@ class LanguageHelper {
       'tip_3': 'Tap any message to edit or delete it',
       'tip_4': 'Tap the camera to save the screenshot',
       'tips_ok': 'Got it',
+      'edited': 'Edited',
+      'edited_message': 'Edited message',
+      'show_as_deleted': 'Show as deleted ("This message was deleted")',
+      'unmark_deleted': 'Show the message again',
+      'show_as_edited': 'Show as edited',
+      'unmark_edited': 'Remove the "Edited" label',
+      'remove_from_chat': 'Remove from the chat',
     },
     'ar': {
       'app_title_1': 'شات',
@@ -527,6 +534,13 @@ class LanguageHelper {
       'tip_3': 'اضغط على أي رسالة لتعديلها أو حذفها',
       'tip_4': 'اضغط الكاميرا لحفظ الصورة',
       'tips_ok': 'فهمت',
+      'edited': 'تم التعديل',
+      'edited_message': 'رسالة معدّلة',
+      'show_as_deleted': 'اعرضها كمحذوفة ("تم حذف هذه الرسالة")',
+      'unmark_deleted': 'أظهر الرسالة مرة أخرى',
+      'show_as_edited': 'اعرضها كمعدّلة',
+      'unmark_edited': 'أزل علامة "تم التعديل"',
+      'remove_from_chat': 'احذفها من المحادثة',
     }
   };
 

@@ -371,6 +371,24 @@ class MessageBubble extends StatelessWidget {
           )
         : bubbleContent;
 
+    if (message.isEdited && message.type == MessageType.text && platform != Platform.whatsapp) {
+      // Messenger, Instagram and Snapchat write "Edited" just above the bubble
+      finalContent = Column(
+        crossAxisAlignment: effectiveSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            child: Text(
+              LanguageHelper.translate('edited', isArabicLocale),
+              style: TextStyle(fontSize: 11, color: platformTheme.timestampColor),
+            ),
+          ),
+          finalContent,
+        ],
+      );
+    }
+
     if (message.isForwarded) {
       finalContent = IntrinsicWidth(
         child: Column(
@@ -932,13 +950,15 @@ class _TextContent extends StatelessWidget {
     final bool isRtlText = _isArabic(message.text);
 
     if (platform == Platform.whatsapp) {
+      final edited = message.isEdited ? LanguageHelper.translate('edited', isArabicLocale) : '';
+      final editedRoom = edited.isEmpty ? 0.0 : edited.length * 6.0 + 6;   // room for "Edited" beside the time
       return Stack(
         children: [
           Padding(
             padding: EdgeInsets.only(
               bottom: 10,
-              left: isArabicLocale ? (isSender ? 55 : 38) : (isRtlText ? 38 : 0),
-              right: isArabicLocale ? 0 : (isRtlText ? 0 : (isSender ? 55 : 38)),
+              left: isArabicLocale ? (isSender ? 55 : 38) + editedRoom : (isRtlText ? 38 + editedRoom : 0),
+              right: isArabicLocale ? 0 : (isRtlText ? 0 : (isSender ? 55 : 38) + editedRoom),
             ),
             child: Text(
               message.text,
@@ -961,7 +981,7 @@ class _TextContent extends StatelessWidget {
                   const SizedBox(width: 3),
                 ],
                 Text(
-                  message.formattedTime,
+                  edited.isEmpty ? message.formattedTime : '$edited ${message.formattedTime}',
                   style: platformTheme.timestampStyle.copyWith(
                     color: platformTheme.chatBg == Colors.black ||
                             platformTheme.chatBg.value == 0xFF0B141A

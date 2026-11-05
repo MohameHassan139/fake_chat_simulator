@@ -9,6 +9,7 @@ import '../widgets/platform_input_bar.dart';
 import '../providers/theme_provider.dart';
 import '../providers/chat_provider.dart';
 import '../utils/language_helper.dart';
+import 'message_list_editor.dart';
 
 class ChatViewport extends StatelessWidget {
   final ChatSession session;
@@ -146,6 +147,21 @@ class ChatViewport extends StatelessWidget {
     return count + (hasWhatsAppBlockCard ? 1 : 0);
   }
 
+  /// A tap or long press on a message opens its actions (edit, reply, show as
+  /// deleted / edited, move, remove). Not while the live playback runs.
+  Widget _tappable(BuildContext context, ChatMessage msg, Widget bubble) {
+    void open() {
+      if (context.read<ChatProvider>().isPlayingConversation) return;
+      showMessageActions(context, msg);
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: open,
+      onLongPress: open,
+      child: bubble,
+    );
+  }
+
   Widget _buildListItem(BuildContext context, int visualIndex, List<ChatMessage> messages, bool isAr) {
     // Index 0 is always the large profile chat banner header
     if (visualIndex == 0) {
@@ -187,7 +203,7 @@ class ChatViewport extends StatelessWidget {
       final bool isFirstInGroup = prevMsg == null || prevMsg.isSender != msg.isSender;
       final bool isLastInGroup = nextMsg == null || nextMsg.isSender != msg.isSender;
 
-      return MessageBubble(
+      return _tappable(context, msg, MessageBubble(
         message: msg,
         contactUser: session.contactUser,
         platform: session.platform,
@@ -195,7 +211,7 @@ class ChatViewport extends StatelessWidget {
         isFirstInGroup: isFirstInGroup,
         isLastInGroup: isLastInGroup,
         isBlockedMe: session.isBlockedMe,
-      );
+      ));
     }
 
     final bool isMessengerOrInstagram = session.platform == Platform.messenger || session.platform == Platform.instagram;
@@ -231,7 +247,7 @@ class ChatViewport extends StatelessWidget {
           final bool isFirstInGroup = isNewTimeGroup || prevMsg.isSender != msg.isSender;
           final bool isLastInGroup = isNextTimeGroup || nextMsg.isSender != msg.isSender;
 
-          return MessageBubble(
+          return _tappable(context, msg, MessageBubble(
             message: msg,
             contactUser: session.contactUser,
             platform: session.platform,
@@ -239,7 +255,7 @@ class ChatViewport extends StatelessWidget {
             isFirstInGroup: isFirstInGroup,
             isLastInGroup: isLastInGroup,
             isBlockedMe: session.isBlockedMe,
-          );
+          ));
         }
         counter++;
       }
@@ -271,7 +287,7 @@ class ChatViewport extends StatelessWidget {
           final bool isFirstInGroup = isNewDateGroup || prevMsg.isSender != msg.isSender;
           final bool isLastInGroup = isNextDateGroup || nextMsg.isSender != msg.isSender;
 
-          return MessageBubble(
+          return _tappable(context, msg, MessageBubble(
             message: msg,
             contactUser: session.contactUser,
             platform: session.platform,
@@ -279,7 +295,7 @@ class ChatViewport extends StatelessWidget {
             isFirstInGroup: isFirstInGroup,
             isLastInGroup: isLastInGroup,
             isBlockedMe: session.isBlockedMe,
-          );
+          ));
         }
         counter++;
       }

@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:uuid/uuid.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/chat_models.dart';
+import '../services/daily_prank.dart';
+import '../utils/language_extra.dart';
 import '../utils/sound_effect_helper.dart';
 
 const _uuid = Uuid();
@@ -442,6 +444,54 @@ class ChatProvider extends ChangeNotifier {
   }
 
   // ─── Sender Toggle ─────────────────────────────────────────────────────────
+
+  /// Ready-made prank chats follow the app's language: a line still exactly
+  /// as the template wrote it (in any language) is written again in the new
+  /// one. Lines the user changed stay as they are.
+  void relocalizePranks(bool isArabic) {
+    String? redo(String text, String ar, String en) {
+      if (text == ar || text == en) return DailyPrank.text(isArabic, ar, en);
+      for (final m in extraByEnglish.values) {
+        if (m[en] == text) return DailyPrank.text(isArabic, ar, en);
+      }
+      return null;
+    }
+
+    var changed = false;
+    for (final session in _sessions) {
+      var touched = false;
+      for (final t in DailyPrank.templates) {
+        final name = redo(session.contactUser.name, t.contactAr, t.contactEn);
+        if (name == null || name == session.contactUser.name) continue;
+        session.contactUser = session.contactUser.copyWith(name: name);
+        touched = true;
+        break;
+      }
+      for (var i = 0; i < session.messages.length; i++) {
+        final msg = session.messages[i];
+        if (msg.type != MessageType.text) continue;
+        for (final t in DailyPrank.templates) {
+          String? text;
+          for (final line in t.lines) {
+            text = redo(msg.text, line.ar, line.en);
+            if (text != null) break;
+          }
+          if (text != null) {
+            if (text != msg.text) {
+              session.messages[i] = msg.copyWith(text: text);
+              touched = true;
+            }
+            break;
+          }
+        }
+      }
+      if (touched) {
+        _saveSession(session);
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
 
   void toggleSenderMode() {
     _isSenderMode = !_isSenderMode;

@@ -93,6 +93,7 @@ class DashboardScreen extends StatelessWidget {
                     : null,
                 onTap: () {
                   themeProvider.setLanguage(e.key);
+                  context.read<ChatProvider>().relocalizePranks(themeProvider.isArabic);
                   Navigator.pop(ctx);
                 },
               ),
@@ -604,7 +605,8 @@ class _MoreMenuState extends State<_MoreMenu> {
           }
         },
         itemBuilder: (_) => [
-          if (!removed)
+          // shown once the store knows the product (until then it does not exist yet)
+          if (!removed && purchases.canBuy)
             PopupMenuItem(
               value: 'remove',
               child: ValueListenableBuilder<String?>(
@@ -613,7 +615,7 @@ class _MoreMenuState extends State<_MoreMenu> {
               ),
             ),
           if (removed) PopupMenuItem(enabled: false, child: Text(t('remove_ads_done'))),
-          if (!removed) PopupMenuItem(value: 'restore', child: Text(t('restore_purchase'))),
+          if (!removed && purchases.canBuy) PopupMenuItem(value: 'restore', child: Text(t('restore_purchase'))),
           PopupMenuItem(
             value: 'reminder',
             child: Text('${t('daily_reminder')}: ${_reminder ? '✓' : '✗'}'),

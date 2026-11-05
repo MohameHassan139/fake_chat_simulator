@@ -182,6 +182,7 @@ class ChatMessage {
   Uint8List? videoBytes;
   Uint8List? audioBytes;
   bool isForwarded;
+  bool isEdited; // shows the platform's "Edited" label
   bool isDeleted;
   bool isOneTime;
   bool isOneTimeOpened;
@@ -207,6 +208,7 @@ class ChatMessage {
     this.videoBytes,
     this.audioBytes,
     this.isForwarded = false,
+    this.isEdited = false,
     this.isDeleted = false,
     this.isOneTime = false,
     this.isOneTimeOpened = false,
@@ -236,6 +238,7 @@ class ChatMessage {
     Uint8List? audioBytes,
     bool clearAudioBytes = false,
     bool? isForwarded,
+    bool? isEdited,
     bool? isDeleted,
     bool? isOneTime,
     bool? isOneTimeOpened,
@@ -261,6 +264,7 @@ class ChatMessage {
       videoBytes: clearVideoBytes ? null : (videoBytes ?? this.videoBytes),
       audioBytes: clearAudioBytes ? null : (audioBytes ?? this.audioBytes),
       isForwarded: isForwarded ?? this.isForwarded,
+      isEdited: isEdited ?? this.isEdited,
       isDeleted: isDeleted ?? this.isDeleted,
       isOneTime: isOneTime ?? this.isOneTime,
       isOneTimeOpened: isOneTimeOpened ?? this.isOneTimeOpened,
@@ -289,6 +293,7 @@ class ChatMessage {
       'videoBytes': MediaStore.ref(videoBytes),
       'audioBytes': MediaStore.ref(audioBytes),
       'isForwarded': isForwarded,
+      'isEdited': isEdited,
       'isDeleted': isDeleted,
       'isOneTime': isOneTime,
       'isOneTimeOpened': isOneTimeOpened,
@@ -321,6 +326,7 @@ class ChatMessage {
       videoBytes: _parseBytes(map['videoBytes']),
       audioBytes: _parseBytes(map['audioBytes']),
       isForwarded: map['isForwarded'] as bool? ?? false,
+      isEdited: map['isEdited'] as bool? ?? false,
       isDeleted: map['isDeleted'] as bool? ?? false,
       isOneTime: map['isOneTime'] as bool? ?? false,
       isOneTimeOpened: map['isOneTimeOpened'] as bool? ?? false,

@@ -44,6 +44,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
   late bool _isVoiceNote;
   late bool _isVideoMessage;
   late bool _isForwarded;
+  late bool _isEdited;
   late bool _isDeleted;
   late bool _isOneTime;
   late bool _isOneTimeOpened;
@@ -81,6 +82,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
     _isVoiceNote = msg?.isVoiceNote ?? false;
     _isVideoMessage = msg?.isVideoMessage ?? false;
     _isForwarded = msg?.isForwarded ?? false;
+    _isEdited = msg?.isEdited ?? false;
     _isDeleted = msg?.isDeleted ?? false;
     _isOneTime = msg?.isOneTime ?? false;
     _isOneTimeOpened = msg?.isOneTimeOpened ?? false;
@@ -313,6 +315,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
           fileSize: _fileSizeController.text.trim().isEmpty ? null : _fileSizeController.text.trim(),
           videoBytes: _videoBytes,
           isForwarded: _isForwarded,
+          isEdited: _isEdited,
           audioBytes: _audioBytes,
           clearAudioBytes: _audioBytes == null,
           isDeleted: _isDeleted,
@@ -340,6 +343,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
         fileSize: _fileSizeController.text.trim().isEmpty ? null : _fileSizeController.text.trim(),
         videoBytes: _videoBytes,
         isForwarded: _isForwarded,
+        isEdited: _isEdited,
         audioBytes: _audioBytes,
         isDeleted: _isDeleted,
         isOneTime: _isOneTime,
@@ -1350,6 +1354,20 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
                   ),
                 ],
               ),
+              // Edited Message Toggle (the "Edited" label real apps show)
+              if (_type == MessageType.text)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(LanguageHelper.translate('edited_message', isAr), style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                    ),
+                    Switch(
+                      value: _isEdited,
+                      activeColor: accentColor,
+                      onChanged: (v) => setState(() => _isEdited = v),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 10),
 
               // Deleted Message Toggle

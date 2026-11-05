@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// (Google forbids asking "do you like the app?" before it).
 class AppFeedback {
   // The developer's support e-mail; the menu item stays hidden while it is empty.
-  static const String supportEmail = '';
+  static const String supportEmail = 'michaelhaleem688@gmail.com';
 
   static bool get available => supportEmail.contains('@');
 

@@ -122,50 +122,56 @@ class _EditableMessageRow extends StatelessWidget {
     );
   }
 
-  void _showContextMenu(BuildContext context) {
+  void _showContextMenu(BuildContext context) => showMessageActions(context, message);
+}
+
+/// Tap or long-press on a message in the chat: reply, edit, mark it as
+/// deleted or edited (the way the real apps show it), move it, or remove it.
+void showMessageActions(BuildContext context, ChatMessage message) {
+  final chat = context.read<ChatProvider>();
+  void openEditor({ChatMessage? editing, ChatMessage? replyTo}) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _MessageContextMenu(
-        message: message,
-        onEdit: () {
-          Navigator.pop(context);
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => ChangeNotifierProvider.value(
-              value: context.read<ChatProvider>(),
-              child: MessageEditorSheet(editingMessage: message),
-            ),
-          );
-        },
-        onReply: () {
-          Navigator.pop(context);
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => ChangeNotifierProvider.value(
-              value: context.read<ChatProvider>(),
-              child: MessageEditorSheet(repliedToMessage: message),
-            ),
-          );
-        },
-        onDelete: () {
-          context.read<ChatProvider>().deleteMessage(message.id);
-          Navigator.pop(context);
-        },
-        onToggleSide: () {
-          context.read<ChatProvider>().updateMessage(
-            message.id,
-            message.copyWith(isSender: !message.isSender),
-          );
-          Navigator.pop(context);
-        },
+      builder: (_) => ChangeNotifierProvider.value(
+        value: chat,
+        child: MessageEditorSheet(editingMessage: editing, repliedToMessage: replyTo),
       ),
     );
   }
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (sheet) => _MessageContextMenu(
+      message: message,
+      onEdit: () {
+        Navigator.pop(sheet);
+        openEditor(editing: message);
+      },
+      onReply: () {
+        Navigator.pop(sheet);
+        openEditor(replyTo: message);
+      },
+      onDelete: () {
+        chat.deleteMessage(message.id);
+        Navigator.pop(sheet);
+      },
+      onToggleSide: () {
+        chat.updateMessage(message.id, message.copyWith(isSender: !message.isSender));
+        Navigator.pop(sheet);
+      },
+      onToggleDeleted: () {
+        chat.updateMessage(message.id, message.copyWith(isDeleted: !message.isDeleted));
+        Navigator.pop(sheet);
+      },
+      onToggleEdited: () {
+        chat.updateMessage(message.id, message.copyWith(isEdited: !message.isEdited));
+        Navigator.pop(sheet);
+      },
+    ),
+  );
 }
 
 class _MessageContextMenu extends StatelessWidget {
@@ -174,6 +180,8 @@ class _MessageContextMenu extends StatelessWidget {
   final VoidCallback onReply;
   final VoidCallback onDelete;
   final VoidCallback onToggleSide;
+  final VoidCallback onToggleDeleted;
+  final VoidCallback onToggleEdited;
 
   const _MessageContextMenu({
     required this.message,
@@ -181,6 +189,8 @@ class _MessageContextMenu extends StatelessWidget {
     required this.onReply,
     required this.onDelete,
     required this.onToggleSide,
+    required this.onToggleDeleted,
+    required this.onToggleEdited,
   });
 
   @override
@@ -269,9 +279,23 @@ class _MessageContextMenu extends StatelessWidget {
               color: const Color(0xFF42A5F5),
               onTap: onToggleSide,
             ),
+          if (MessageFeatureRules.canBeDeleted(message.type))
+            _MenuItem(
+              icon: Icons.block_rounded,
+              label: LanguageHelper.translate(message.isDeleted ? 'unmark_deleted' : 'show_as_deleted', isAr),
+              color: const Color(0xFFFFA726),
+              onTap: onToggleDeleted,
+            ),
+          if (message.type == MessageType.text && !message.isDeleted)
+            _MenuItem(
+              icon: Icons.edit_note_rounded,
+              label: LanguageHelper.translate(message.isEdited ? 'unmark_edited' : 'show_as_edited', isAr),
+              color: const Color(0xFF26A69A),
+              onTap: onToggleEdited,
+            ),
           _MenuItem(
             icon: Icons.delete_rounded,
-            label: LanguageHelper.translate('delete_message', isAr),
+            label: LanguageHelper.translate('remove_from_chat', isAr),
             color: Colors.redAccent,
             onTap: onDelete,
           ),
