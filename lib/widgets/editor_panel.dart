@@ -17,6 +17,7 @@ import 'contact_editor_sheet.dart';
 import 'settings_editor_sheet.dart';
 import 'message_editor_sheet.dart';
 import 'background_remover_dialog.dart';
+import '../services/premium_service.dart';
 
 class EditorPanel extends StatelessWidget {
   final VoidCallback onCapture;
@@ -409,6 +410,7 @@ class _ActionRow extends StatelessWidget {
   }
 
   Future<void> _pickStickerAndRemoveBackground(BuildContext context) async {
+    if (!await PremiumPass.instance.ensure(context) || !context.mounted) return;
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
     if (file != null && context.mounted) {

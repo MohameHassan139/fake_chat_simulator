@@ -17,6 +17,7 @@ import '../utils/language_helper.dart';
 import '../widgets/live_setup_dialog.dart';
 import '../services/ad_service.dart';
 import '../services/review_service.dart';
+import '../services/premium_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -59,10 +60,11 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  void _startLiveSimulation(BuildContext context) {
+  Future<void> _startLiveSimulation(BuildContext context) async {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final session = chatProvider.activeSession;
     if (session == null) return;
+    if (!await PremiumPass.instance.ensure(context) || !context.mounted) return;
 
     showDialog(
       context: context,

@@ -12,6 +12,7 @@ import '../themes/platform_themes.dart';
 import '../utils/language_helper.dart';
 import 'editor_panel.dart';
 import 'background_remover_dialog.dart';
+import '../services/premium_service.dart';
 
 const _uuid = Uuid();
 
@@ -194,6 +195,7 @@ class _MessageEditorSheetState extends State<MessageEditorSheet> {
   }
 
   Future<void> _pickStickerAndRemoveBackground() async {
+    if (!await PremiumPass.instance.ensure(context) || !mounted) return;
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
     if (file != null) {

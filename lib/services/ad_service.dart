@@ -7,7 +7,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 /// AdMob for Fake Chat: a small banner on the dashboard only (never on the chat
 /// screen, so screenshots stay clean) and an interstitial after a saved
-/// screenshot, at most every 2nd save and 2 minutes apart.
+/// screenshot, at most every 2nd save and 2 minutes apart. A rewarded ad
+/// unlocks the premium features for a day (see premium_service.dart).
 ///
 /// Real AdMob ids (app ca-app-pub-2509095132117735~9332794603). Debug builds
 /// always get Google's TEST ids: tapping real ads on our own phones counts as
@@ -17,12 +18,17 @@ class AdIds {
 
   static const String _testBanner = 'ca-app-pub-3940256099942544/6300978111';
   static const String _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
+  static const String _testRewarded = 'ca-app-pub-3940256099942544/5224354917';
 
   static const String _banner = 'ca-app-pub-2509095132117735/2090114233';
   static const String _interstitial = 'ca-app-pub-2509095132117735/8220583328';
+  // The Rewarded unit from AdMob (Apps > Fake Chat > Ad units > Rewarded).
+  // While it is empty, release builds keep the premium features free.
+  static const String _rewarded = '';
 
   static String get banner => useTestAds ? _testBanner : _banner;
   static String get interstitial => useTestAds ? _testInterstitial : _interstitial;
+  static String get rewarded => useTestAds ? _testRewarded : _rewarded;
 }
 
 class AdService {
@@ -34,6 +40,7 @@ class AdService {
 
   bool _ready = false;
   InterstitialAd? _interstitial;
+  RewardedAd? _rewarded;
   int _saves = 0;
   DateTime? _lastShown;
 
@@ -50,6 +57,7 @@ class AdService {
       await MobileAds.instance.initialize();
       _ready = true;
       _loadInterstitial();
+      _loadRewarded();
     } catch (e) {
       debugPrint('AdService.init failed: $e');
     }
@@ -88,6 +96,52 @@ class AdService {
         },
       ),
     );
+  }
+
+  /// True when a rewarded ad can gate the premium features at all.
+  bool get rewardedEnabled => _ready && AdIds.rewarded.isNotEmpty;
+
+  void _loadRewarded() {
+    if (!rewardedEnabled) return;
+    RewardedAd.load(
+      adUnitId: AdIds.rewarded,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) => _rewarded = ad,
+        onAdFailedToLoad: (error) {
+          debugPrint('Rewarded failed to load: $error');
+          _rewarded = null;
+        },
+      ),
+    );
+  }
+
+  /// Shows the rewarded ad. Returns true when the user watched it to the end,
+  /// false when they closed it early, null when no ad was ready.
+  Future<bool?> showRewarded() {
+    final ad = _rewarded;
+    if (ad == null) {
+      _loadRewarded();
+      return Future.value(null);
+    }
+    final done = Completer<bool?>();
+    var earned = false;
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _loadRewarded();
+        if (!done.isCompleted) done.complete(earned);
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _loadRewarded();
+        if (!done.isCompleted) done.complete(null);
+      },
+    );
+    _rewarded = null;
+    _lastShown = DateTime.now();                     // no interstitial right after it
+    ad.show(onUserEarnedReward: (_, __) => earned = true);
+    return done.future;
   }
 
   /// Called after a screenshot was saved: shows an ad every [savesPerAd]
